@@ -1,0 +1,23 @@
+From: Karsten Böddeker <freifunk@kb-light.de>
+Date: Sat, 23 Apr 2016 15:20:29 +0200
+Subject: iw: Re-enable 'iw connect'
+
+diff --git a/package/network/utils/iw/patches/200-reduce_size.patch b/package/network/utils/iw/patches/200-reduce_size.patch
+index 3f92982a4ad4df1d286c012943f7d4b2ca2c6494..1c2833978571d2fed006657d6cf855751584ec19 100644
+--- a/package/network/utils/iw/patches/200-reduce_size.patch
++++ b/package/network/utils/iw/patches/200-reduce_size.patch
+@@ -1,12 +1,10 @@
+ --- a/Makefile
+ +++ b/Makefile
+-@@ -16,8 +16,8 @@ CFLAGS += -Wall -Wundef -Wstrict-prototy
+- OBJS = iw.o genl.o event.o info.o phy.o \
++@@ -17,7 +17,7 @@ OBJS = iw.o genl.o event.o info.o phy.o
+  	interface.o ibss.o station.o survey.o util.o ocb.o \
+  	mesh.o mpath.o mpp.o scan.o reg.o version.o \
+--	reason.o status.o connect.o link.o offch.o ps.o cqm.o \
++ 	reason.o status.o connect.o link.o offch.o ps.o cqm.o \
+ -	bitrate.o wowlan.o coalesce.o roc.o p2p.o vendor.o
+-+	reason.o status.o link.o offch.o ps.o cqm.o \
+ +	bitrate.o vendor.o
+  OBJS += sections.o
+  
