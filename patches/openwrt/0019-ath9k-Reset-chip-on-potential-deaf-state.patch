@@ -1,0 +1,129 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Fri, 2 Dec 2016 15:36:33 +0100
+Subject: ath9k: Reset chip on potential deaf state
+
+The chip is switching seemingly random into a state which can be described
+as "deaf". No or nearly no interrupts are generated anymore for incoming
+packets. Existing links either break down after a while and new links will
+not be established.
+
+The driver doesn't know if there is no other device available or if it
+ended up in an "deaf" state. Resetting the chip proactively avoids
+permanent problems in case the chip really was in its "deaf" state but
+maybe causes unnecessary resets in case it wasn't "deaf".
+
+Signed-off-by: Simon Wunderlich <simon.wunderlich@open-mesh.com>
+[sven.eckelmann@open-mesh.com: port to recent ath9k, add commit message]
+Signed-off-by: Sven Eckelmann <sven.eckelmann@open-mesh.com>
+
+diff --git a/package/kernel/mac80211/patches/953-ath9k-add-workaround-for-hanging-chip-not-enough-int.patch b/package/kernel/mac80211/patches/953-ath9k-add-workaround-for-hanging-chip-not-enough-int.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8158444f1afdce61ae3c57e2b80f41dd12aa1db
+--- /dev/null
++++ b/package/kernel/mac80211/patches/953-ath9k-add-workaround-for-hanging-chip-not-enough-int.patch
+@@ -0,0 +1,105 @@
++From: Simon Wunderlich <siwu@hrz.tu-chemnitz.de>
++Date: Tue, 18 Jun 2013 12:25:27 +0200
++Subject: [PATCH] ath9k: add workaround for hanging chip (not enough interrupts)
++
++Signed-off-by: Simon Wunderlich <siwu@hrz.tu-chemnitz.de>
++
++Forwarded: https://patchwork.kernel.org/patch/9427655/
++---
++ drivers/net/wireless/ath/ath9k/ath9k.h |  3 +++
++ drivers/net/wireless/ath/ath9k/debug.c |  1 +
++ drivers/net/wireless/ath/ath9k/debug.h |  1 +
++ drivers/net/wireless/ath/ath9k/link.c  | 28 ++++++++++++++++++++++++++++
++ drivers/net/wireless/ath/ath9k/main.c  |  2 ++
++ 5 files changed, 35 insertions(+)
++
++diff --git a/drivers/net/wireless/ath/ath9k/ath9k.h b/drivers/net/wireless/ath/ath9k/ath9k.h
++index 90913bfae0177942621ee09acb6a783c671cf9a2..1004a28a0139fe2939ec531d3b77e2ea9f750994 100644
++--- a/drivers/net/wireless/ath/ath9k/ath9k.h
+++++ b/drivers/net/wireless/ath/ath9k/ath9k.h
++@@ -1061,6 +1061,9 @@ struct ath_softc {
++ 
++ 	u16 airtime_flags; /* AIRTIME_* */
++ 
+++	u64 last_check_time;
+++	u32 last_check_interrupts;
+++
++ 	struct ath_rx rx;
++ 	struct ath_tx tx;
++ 	struct ath_beacon beacon;
++diff --git a/drivers/net/wireless/ath/ath9k/debug.c b/drivers/net/wireless/ath/ath9k/debug.c
++index 6228b1dea6cffd371c885c508e75d45762119414..d3336a28fc170d364a0c417d5457b9da19de6903 100644
++--- a/drivers/net/wireless/ath/ath9k/debug.c
+++++ b/drivers/net/wireless/ath/ath9k/debug.c
++@@ -766,6 +766,7 @@ static int read_file_reset(struct seq_file *file, void *data)
++ 		[RESET_TX_DMA_ERROR] = "Tx DMA stop error",
++ 		[RESET_RX_DMA_ERROR] = "Rx DMA stop error",
++ 		[RESET_TYPE_DEADBEEF] = "deadbeef hang",
+++		[RESET_TYPE_DEAF] = "deaf hang",
++ 	};
++ 	int i;
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/debug.h b/drivers/net/wireless/ath/ath9k/debug.h
++index 60ada5dd21c9d456f15c8c1f785aeeba4e1acc60..d8e618aead7f70211456767fdcef77fb6b634fa4 100644
++--- a/drivers/net/wireless/ath/ath9k/debug.h
+++++ b/drivers/net/wireless/ath/ath9k/debug.h
++@@ -53,6 +53,7 @@ enum ath_reset_type {
++ 	RESET_TX_DMA_ERROR,
++ 	RESET_RX_DMA_ERROR,
++ 	RESET_TYPE_DEADBEEF,
+++	RESET_TYPE_DEAF,
++ 	__RESET_TYPE_MAX
++ };
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/link.c b/drivers/net/wireless/ath/ath9k/link.c
++index da7d31fe16724ad687d09920a3f874e42579dbe4..2b4640a7d16134c19d2071c57203d3cf286a46f6 100644
++--- a/drivers/net/wireless/ath/ath9k/link.c
+++++ b/drivers/net/wireless/ath/ath9k/link.c
++@@ -349,6 +349,34 @@ void ath_ani_calibrate(unsigned long data)
++ 		common->ani.longcal_timer = timestamp;
++ 	}
++ 
+++	/* one more check for stuck MAC - not reasonably enough rx interrupts? */
+++	ath_dbg(common, CALIBRATE, "DEAFFIX: Doing a %s cal\n", longcal ? "long" : "short");
+++	if (longcal) {
+++		u32 interval, interrupts, interrupt_per_s;
+++
+++		interval = jiffies_to_msecs(jiffies - sc->last_check_time);
+++		if (sc->sc_ah->caps.hw_caps & ATH9K_HW_CAP_EDMA)
+++			interrupts = sc->debug.stats.istats.rxlp - sc->last_check_interrupts;
+++		else
+++			interrupts = sc->debug.stats.istats.rxok - sc->last_check_interrupts;
+++
+++		/* sanity check, should be 30 seconds */
+++		if (interval < 40000 && interval > 20000) {
+++			/* should be at least one interrupt per second */
+++			interrupt_per_s = interrupts / (interval / 1000);
+++			ath_dbg(common, CALIBRATE, "DEAFFIX: Got %u interrupts in %u sec, %u i/s\n", interrupts, (interval / 1000), interrupt_per_s);
+++			if (interrupt_per_s < 1) {
+++				printk("ath9k: reset deaf state\n");
+++				ath9k_queue_reset(sc, RESET_TYPE_DEAF);
+++			}
+++		}
+++		if (sc->sc_ah->caps.hw_caps & ATH9K_HW_CAP_EDMA)
+++			sc->last_check_interrupts = sc->debug.stats.istats.rxlp;
+++		else
+++			sc->last_check_interrupts = sc->debug.stats.istats.rxok;
+++		sc->last_check_time = jiffies;
+++	}
+++
++ 	/* Short calibration applies only while caldone is false */
++ 	if (!common->ani.caldone) {
++ 		if ((timestamp - common->ani.shortcal_timer) >= short_cal_interval) {
++diff --git a/drivers/net/wireless/ath/ath9k/main.c b/drivers/net/wireless/ath/ath9k/main.c
++index fbba4ce61bf2059bc8d5e92547205943e04160c7..474763ae7ad505a95142a27cc05da12fdcf7862f 100644
++--- a/drivers/net/wireless/ath/ath9k/main.c
+++++ b/drivers/net/wireless/ath/ath9k/main.c
++@@ -663,6 +663,8 @@ static int ath9k_start(struct ieee80211_hw *hw)
++ 		"Starting driver with initial channel: %d MHz\n",
++ 		curchan->center_freq);
++ 
+++	printk("ath9k: DEAF fix v0.1\n");
+++
++ 	ath9k_ps_wakeup(sc);
++ 	mutex_lock(&sc->mutex);
++ 
