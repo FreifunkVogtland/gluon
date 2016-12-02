@@ -1,0 +1,145 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Fri, 2 Dec 2016 15:36:33 +0100
+Subject: ath9k: Reset chip on potential deaf state
+
+The chip is switching seemingly random into a state which can be described
+as "deaf". No or nearly no interrupts are generated anymore for incoming
+packets. Existing links either break down after a while and new links will
+not be established.
+
+The driver doesn't know if there is no other device available or if it
+ended up in an "deaf" state. Resetting the chip proactively avoids
+permanent problems in case the chip really was in its "deaf" state but
+maybe causes unnecessary resets in case it wasn't "deaf".
+
+Signed-off-by: Simon Wunderlich <simon.wunderlich@open-mesh.com>
+[sven.eckelmann@open-mesh.com: port to recent ath9k, add commit message]
+Signed-off-by: Sven Eckelmann <sven.eckelmann@open-mesh.com>
+
+diff --git a/package/kernel/mac80211/patches/ath/953-ath9k-add-workaround-for-hanging-chip-not-enough-int.patch b/package/kernel/mac80211/patches/ath/953-ath9k-add-workaround-for-hanging-chip-not-enough-int.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7604ea0849072b4299d89d98b946b9286ee2bca9
+--- /dev/null
++++ b/package/kernel/mac80211/patches/ath/953-ath9k-add-workaround-for-hanging-chip-not-enough-int.patch
+@@ -0,0 +1,121 @@
++From: Simon Wunderlich <simon.wunderlich@open-mesh.com>
++Date: Thu, 17 Nov 2016 09:36:14 +0100
++Subject: ath9k: Reset chip on potential deaf state
++
++The chip is switching seemingly random into a state which can be described
++as "deaf". No or nearly no interrupts are generated anymore for incoming
++packets. Existing links either break down after a while and new links will
++not be established.
++
++The driver doesn't know if there is no other device available or if it
++ended up in an "deaf" state. Resetting the chip proactively avoids
++permanent problems in case the chip really was in its "deaf" state but
++maybe causes unnecessary resets in case it wasn't "deaf".
++
++Signed-off-by: Simon Wunderlich <simon.wunderlich@open-mesh.com>
++[sven.eckelmann@open-mesh.com: port to recent ath9k, add commit message]
++Signed-off-by: Sven Eckelmann <sven.eckelmann@open-mesh.com>
++
++diff --git a/drivers/net/wireless/ath/ath9k/ath9k.h b/drivers/net/wireless/ath/ath9k/ath9k.h
++index 7fb33b64ec7e24be444c59b22af0b5f526ddfc67..62072e4dbb5825f0d7d16ae6317071614278cad1 100644
++--- a/drivers/net/wireless/ath/ath9k/ath9k.h
+++++ b/drivers/net/wireless/ath/ath9k/ath9k.h
++@@ -1061,6 +1061,9 @@ struct ath_softc {
++ 
++ 	u16 airtime_flags; /* AIRTIME_* */
++ 
+++	unsigned long last_check_time;
+++	u32 last_check_interrupts;
+++
++ 	struct ath_rx rx;
++ 	struct ath_tx tx;
++ 	struct ath_beacon beacon;
++diff --git a/drivers/net/wireless/ath/ath9k/debug.c b/drivers/net/wireless/ath/ath9k/debug.c
++index 1aeabb58dc022127ba1857262b82f52403c8e4ac..c9e7aeb765fa649344340ee3880f38ee9f9ef40e 100644
++--- a/drivers/net/wireless/ath/ath9k/debug.c
+++++ b/drivers/net/wireless/ath/ath9k/debug.c
++@@ -766,6 +766,7 @@ static int read_file_reset(struct seq_file *file, void *data)
++ 		[RESET_TX_DMA_ERROR] = "Tx DMA stop error",
++ 		[RESET_RX_DMA_ERROR] = "Rx DMA stop error",
++ 		[RESET_TYPE_DEADBEEF] = "deadbeef hang",
+++		[RESET_TYPE_DEAF] = "deaf hang",
++ 	};
++ 	int i;
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/debug.h b/drivers/net/wireless/ath/ath9k/debug.h
++index 60ada5dd21c9d456f15c8c1f785aeeba4e1acc60..d8e618aead7f70211456767fdcef77fb6b634fa4 100644
++--- a/drivers/net/wireless/ath/ath9k/debug.h
+++++ b/drivers/net/wireless/ath/ath9k/debug.h
++@@ -53,6 +53,7 @@ enum ath_reset_type {
++ 	RESET_TX_DMA_ERROR,
++ 	RESET_RX_DMA_ERROR,
++ 	RESET_TYPE_DEADBEEF,
+++	RESET_TYPE_DEAF,
++ 	__RESET_TYPE_MAX
++ };
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/link.c b/drivers/net/wireless/ath/ath9k/link.c
++index 1ed6f2fd27b4db1adc9a0e8489b7e937ca068f22..3302a30adc98f52bcb4f2e79f1ab4f0bf0e96e68 100644
++--- a/drivers/net/wireless/ath/ath9k/link.c
+++++ b/drivers/net/wireless/ath/ath9k/link.c
++@@ -159,13 +159,59 @@ static bool ath_hw_hang_deadbeef(struct ath_softc *sc)
++ 	return true;
++ }
++ 
+++static bool ath_hw_hang_deaf(struct ath_softc *sc)
+++{
+++#if !defined(CPTCFG_ATH9K_DEBUGFS) || defined(CPTCFG_ATH9K_TX99)
+++	return false;
+++#else
+++	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
+++	u32 interrupts, interrupt_per_s;
+++	unsigned int interval;
+++
+++	/* get historic data */
+++	interval = jiffies_to_msecs(jiffies - sc->last_check_time);
+++	if (sc->sc_ah->caps.hw_caps & ATH9K_HW_CAP_EDMA)
+++		interrupts = sc->debug.stats.istats.rxlp + sc->debug.stats.istats.rxhp;
+++	else
+++		interrupts = sc->debug.stats.istats.rxok;
+++
+++	interrupts -= sc->last_check_interrupts;
+++
+++	/* save current data */
+++	sc->last_check_time = jiffies;
+++	if (sc->sc_ah->caps.hw_caps & ATH9K_HW_CAP_EDMA)
+++		sc->last_check_interrupts = sc->debug.stats.istats.rxlp + sc->debug.stats.istats.rxhp;
+++	else
+++		sc->last_check_interrupts = sc->debug.stats.istats.rxok;
+++
+++	/* sanity check, should be 30 seconds */
+++	if (interval > 40000 || interval < 20000)
+++		return false;
+++
+++	/* should be at least one interrupt per second */
+++	interrupt_per_s = interrupts / (interval / 1000);
+++	if (interrupt_per_s >= 1)
+++		return false;
+++
+++	ath_dbg(common, RESET,
+++		"RX deaf hang is detected. Schedule chip reset\n");
+++	ath9k_queue_reset(sc, RESET_TYPE_DEAF);
+++
+++	return true;
+++#endif
+++}
+++
++ void ath_hw_hang_work(struct work_struct *work)
++ {
++ 	struct ath_softc *sc = container_of(work, struct ath_softc,
++ 					    hw_hang_work.work);
++ 
++-	ath_hw_hang_deadbeef(sc);
+++	if (ath_hw_hang_deadbeef(sc))
+++		goto requeue_worker;
++ 
+++	ath_hw_hang_deaf(sc);
+++
+++requeue_worker:
++ 	ieee80211_queue_delayed_work(sc->hw, &sc->hw_hang_work,
++ 				     msecs_to_jiffies(ATH_HANG_WORK_INTERVAL));
++ }
