@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/event-source-polyfill/0.0.7/eventsource.min.js"></script> <!-- polyfill -->
     <script>
       var bootstrapUrl = "/cgi-bin/nodeinfo";
-      
+
       undivert(app.js)
     </script>
   </head>
