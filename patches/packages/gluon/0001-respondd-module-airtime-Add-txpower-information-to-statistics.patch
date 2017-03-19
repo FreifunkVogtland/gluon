@@ -1,0 +1,168 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sun, 19 Mar 2017 09:51:14 +0100
+Subject: respondd-module-airtime: Add txpower information to statistics
+
+Forwarded: no
+
+diff --git a/net/respondd-module-airtime/src/Makefile b/net/respondd-module-airtime/src/Makefile
+index 61f6da50f4fb0d24294df75b677985788354a497..b9276c855b7e369996d14d01a47d3e5345a5455f 100644
+--- a/net/respondd-module-airtime/src/Makefile
++++ b/net/respondd-module-airtime/src/Makefile
+@@ -9,7 +9,7 @@ all: respondd.so
+ 
+ %.c: %.h
+ 
+-respondd.so: netlink.c airtime.c ifaces.c respondd.c
++respondd.so: netlink.c airtime.c ifaces.c respondd.c txpower.c
+ 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared -fPIC -D_GNU_SOURCE -lnl-tiny -o $@ $^ $(LDLIBS)
+ 
+ clean:
+diff --git a/net/respondd-module-airtime/src/respondd.c b/net/respondd-module-airtime/src/respondd.c
+index 4648bd421ff9d03a52f3d9a03cd0c3d456bbefed..e9c24bf3246dba5492c2d7438c49885e3fa022f7 100644
+--- a/net/respondd-module-airtime/src/respondd.c
++++ b/net/respondd-module-airtime/src/respondd.c
+@@ -4,10 +4,11 @@
+ #include <respondd.h>
+ 
+ #include "airtime.h"
++#include "txpower.h"
+ #include "ifaces.h"
+ 
+ static struct json_object *respondd_provider_statistics(void) {
+-	struct json_object *result, *wireless;
++	struct json_object *result, *wireless, *txpower;
+ 	struct iface_list *ifaces;
+ 
+ 	result = json_object_new_object();
+@@ -20,9 +21,17 @@ static struct json_object *respondd_provider_statistics(void) {
+ 		return NULL;
+ 	}
+ 
++	txpower = json_object_new_array();
++	if (!txpower) {
++		json_object_put(wireless);
++		json_object_put(result);
++		return NULL;
++	}
++
+ 	ifaces = get_ifaces();
+ 	while (ifaces != NULL) {
+ 		get_airtime(wireless, ifaces->ifx);
++		get_txpower(txpower, ifaces->ifx);
+ 
+ 		void *freeptr = ifaces;
+ 		ifaces = ifaces->next;
+@@ -30,6 +39,7 @@ static struct json_object *respondd_provider_statistics(void) {
+ 	}
+ 
+ 	json_object_object_add(result, "wireless", wireless);
++	json_object_object_add(result, "txpower", txpower);
+ 	return result;
+ }
+ 
+diff --git a/net/respondd-module-airtime/src/txpower.c b/net/respondd-module-airtime/src/txpower.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..d2fb9e2c1d498fcef860c0e32c81210d816f7b68
+--- /dev/null
++++ b/net/respondd-module-airtime/src/txpower.c
+@@ -0,0 +1,87 @@
++/*
++  Copyright (c) 2016, Julian Kornberger <jk+freifunk@digineo.de>
++                      Martin Müller <geno+ffhb@fireorbit.de>
++                      Jan-Philipp Litza <janphilipp@litza.de>
++                      Sven Eckelmann <sven@narfation.org>
++  All rights reserved.
++
++  Redistribution and use in source and binary forms, with or without
++  modification, are permitted provided that the following conditions are met:
++
++    1. Redistributions of source code must retain the above copyright notice,
++       this list of conditions and the following disclaimer.
++    2. Redistributions in binary form must reproduce the above copyright notice,
++       this list of conditions and the following disclaimer in the documentation
++       and/or other materials provided with the distribution.
++
++  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
++  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++*/
++
++#include <linux/nl80211.h>
++#include <netlink/genl/genl.h>
++
++#include "netlink.h"
++#include "txpower.h"
++
++static int survey_txpower_handler(struct nl_msg *msg, void *arg) {
++	struct json_object *parent_json = (struct json_object *) arg;
++	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
++	struct nlattr *tb_msg[NL80211_ATTR_MAX + 1];
++
++	nla_parse(tb_msg, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
++		  genlmsg_attrlen(gnlh, 0), NULL);
++
++	/* required */
++	if (!tb_msg[NL80211_ATTR_WIPHY_FREQ] ||
++	    !tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL])
++		return NL_SKIP;
++
++	struct json_object *freq_json = json_object_new_object();
++	if (!freq_json) {
++		fprintf(stderr, "respondd-module-txpower: failed allocating JSON object\n");
++		return NL_SKIP;
++	}
++
++	if (tb_msg[NL80211_ATTR_WIPHY_FREQ]) {
++		struct json_object *data_json = NULL;
++		uint32_t freq = nla_get_u32(tb_msg[NL80211_ATTR_WIPHY_FREQ]);
++
++		data_json = json_object_new_int(freq);
++		if (!data_json)
++			goto abort;
++
++		json_object_object_add(freq_json, "frequency", data_json);
++	}
++
++	if (tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL]) {
++		struct json_object *data_json = NULL;
++		uint32_t mbm = nla_get_u32(tb_msg[NL80211_ATTR_WIPHY_TX_POWER_LEVEL]);
++
++		data_json = json_object_new_int(mbm);
++		if (!data_json)
++			goto abort;
++
++		json_object_object_add(freq_json, "mbm", data_json);
++	}
++
++	json_object_array_add(parent_json, freq_json);
++
++	return NL_STOP;
++
++abort:
++	json_object_put(freq_json);
++	return NL_SKIP;
++}
++
++bool get_txpower(struct json_object *result, int ifx) {
++	return nl_send_dump(survey_txpower_handler, result, NL80211_CMD_GET_INTERFACE, ifx);
++}
+diff --git a/net/respondd-module-airtime/src/txpower.h b/net/respondd-module-airtime/src/txpower.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..c315ef254f1e38ec129ca3f617929f7d4fdb348c
+--- /dev/null
++++ b/net/respondd-module-airtime/src/txpower.h
+@@ -0,0 +1,7 @@
++#pragma once
++
++#include <stdbool.h>
++#include <stdint.h>
++#include <json-c/json.h>
++
++__attribute__((visibility("hidden"))) bool get_txpower(struct json_object *result, int ifx);
