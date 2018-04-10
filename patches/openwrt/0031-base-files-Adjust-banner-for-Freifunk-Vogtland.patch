@@ -1,0 +1,46 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 10 Apr 2018 21:25:29 +0200
+Subject: base-files: Adjust banner for Freifunk Vogtland
+
+Reported-by: Pascal Wettin <p.wettin@gmx.de>
+Reported-by: André Fiedler <andre.fiedler@me.com>
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/package/base-files/files/etc/banner b/package/base-files/files/etc/banner
+index f3af3c014f20f1b1157bde1cadae64cab0189c9f..323482b3f01b862b17717e9cf6900246074982e8 100644
+--- a/package/base-files/files/etc/banner
++++ b/package/base-files/files/etc/banner
+@@ -1,8 +1,26 @@
+-  _______                     ________        __
+- |       |.-----.-----.-----.|  |  |  |.----.|  |_
+- |   -   ||  _  |  -__|     ||  |  |  ||   _||   _|
+- |_______||   __|_____|__|__||________||__|  |____|
+-          |__| W I R E L E S S   F R E E D O M
+- -----------------------------------------------------
++ ===========================================================
++  _    __            __  __                __
++ | |  / /___  ____ _/ /_/ /___ _____  ____/ /
++ | | / / __ \/ __ `/ __/ / __ `/ __ \/ __  /
++ | |/ / /_/ / /_/ / /_/ / /_/ / / / / /_/ / _
++ |___/\____/\__, /\__/_/\__,_/_/ /_/\__,_/ (_)
++           /____/
++     ______          _ ____            __                __
++    / ____/_______  (_) __/_  ______  / /__  ____  ___  / /_
++   / /_  / ___/ _ \/ / /_/ / / / __ \/ //_/ / __ \/ _ \/ __/
++  / __/ / /  /  __/ / __/ /_/ / / / / ,< _ / / / /  __/ /_
++ /_/   /_/   \___/_/_/  \__,_/_/ /_/_/|_(_)_/ /_/\___/\__/
++
+  %D %V, %C
+- -----------------------------------------------------
++ -----------------------------------------------------------
++  Swimming Pool
++
++  * 2cl Wodka
++  * 6cl Ananassaft
++  * 2cl Creme of Coconut
++  * 1cl Blue Curacao
++  * 2cl Sahne
++  * 1 Stueck Stielkirsche
++  * 1 Stueck Ananas
++  * 20cl Crushed Ice
++ ===========================================================
