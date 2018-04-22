@@ -22,7 +22,7 @@ index e67b5e38561e841b88e486341950c52e1d454322..121b182d9f2d63407a83a576212feabd
  	ucidef_set_led_netdev "wan" "WAN" "pcs:blue:wan" "eth1"
  	ucidef_set_led_switch "lan1" "LAN1" "pcs:blue:lan1" "switch0" "0x04"
 diff --git a/target/linux/ar71xx/base-files/etc/board.d/02_network b/target/linux/ar71xx/base-files/etc/board.d/02_network
-index 27a0266923743d4856919b9c8772a40e59febe83..92586016d6b4b7a04da01a1d9c2cfdf2f03767e5 100755
+index 454abe6a5005621967dd96e0282e7bce2a0b127e..5fc4684e14bcb0834a5517bb04d161f75568aeb0 100755
 --- a/target/linux/ar71xx/base-files/etc/board.d/02_network
 +++ b/target/linux/ar71xx/base-files/etc/board.d/02_network
 @@ -67,6 +67,7 @@ ar71xx_setup_interfaces()
@@ -34,10 +34,10 @@ index 27a0266923743d4856919b9c8772a40e59febe83..92586016d6b4b7a04da01a1d9c2cfdf2
  	eap300v2|\
  	eap7660d|\
 diff --git a/target/linux/ar71xx/base-files/lib/ar71xx.sh b/target/linux/ar71xx/base-files/lib/ar71xx.sh
-index de6042b202bbd07e64833743933be1cbaf1ed495..685ceabe213a692bc180ac9ffa2a86458a08e34f 100755
+index 8f8158bac8a28db4f4f15ce5c37f48a21084dc03..d0a92580cebd42b71f6bca32de952786579668d9 100755
 --- a/target/linux/ar71xx/base-files/lib/ar71xx.sh
 +++ b/target/linux/ar71xx/base-files/lib/ar71xx.sh
-@@ -347,11 +347,11 @@ tplink_pharos_get_model_string() {
+@@ -350,11 +350,11 @@ tplink_pharos_get_model_string() {
  
  	# The returned string will end with \r\n, but we don't remove it here
  	# to simplify matching against it in the sysupgrade image check
@@ -51,22 +51,48 @@ index de6042b202bbd07e64833743933be1cbaf1ed495..685ceabe213a692bc180ac9ffa2a8645
  	local oIFS="$IFS"; IFS=":"; set -- $model_string; IFS="$oIFS"
  
  	local model="${1%%\(*}"
-@@ -512,6 +512,10 @@ ar71xx_board_detect() {
+@@ -375,6 +375,25 @@ gl_inet_board_detect() {
+ 	esac
+ }
+ 
++tplink_pharos_v2_get_model_string() {
++	local part
++	part=$(find_mtd_part 'product-info')
++	[ -z "$part" ] && return 1
++
++	# The returned string will end with \r\n, but we don't remove it here
++	# to simplify matching against it in the sysupgrade image check
++	dd if=$part bs=1 skip=4360 count=64 2>/dev/null | tr -d '\r\0' | head -n 1
++}
++
++tplink_pharos_v2_board_detect() {
++	local model_string="$(tplink_pharos_v2_get_model_string)"
++	local oIFS="$IFS"; IFS=":"; set -- $model_string; IFS="$oIFS"
++
++	local model="${1%%\(*}"
++
++	AR71XX_MODEL="TP-Link $model v$2"
++}
++
+ ar71xx_board_detect() {
+ 	local machine
+ 	local name
+@@ -515,6 +534,10 @@ ar71xx_board_detect() {
  		name="cpe210"
  		tplink_pharos_board_detect
  		;;
 +	*"CPE210 v2")
 +		name="cpe210v2"
-+		tplink_pharos_board_detect
++		tplink_pharos_v2_board_detect
 +		;;
  	*"CPE510/520")
  		name="cpe510"
  		tplink_pharos_board_detect
 diff --git a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
-index e748a2559cdb3a0ca6618429b0f613a656e39388..5e740fcabba6b37d96b9d5d66d6b4b7391374d62 100755
+index 774e3c8964ef724d1efbae56434aeaa9f1c298a4..1ac73cb7fdc9a6be508ba1d806f3589cfa01e921 100755
 --- a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
 +++ b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
-@@ -94,9 +94,10 @@ tplink_get_image_boot_size() {
+@@ -110,9 +110,10 @@ tplink_pharos_check_support_list() {
  }
  
  tplink_pharos_check_image() {
@@ -80,16 +106,42 @@ index e748a2559cdb3a0ca6618429b0f613a656e39388..5e740fcabba6b37d96b9d5d66d6b4b73
  		return 1
  	}
  
-@@ -110,7 +111,7 @@ tplink_pharos_check_image() {
- 	# read loop won't be executed at all, it will return true, so the image
- 	# is accepted (loading the first 1.5M of a remote image for this check seems
- 	# a bit extreme)
--	dd if="$1" bs=1 skip=1511432 count=1024 2>/dev/null | while read line; do
+@@ -128,6 +129,34 @@ tplink_pharos_check_image() {
+ 	return 0
+ }
+ 
++tplink_pharos_v2_check_image() {
++	local image_magic="$(get_magic_long "$1")"
++	local board_magic="$2"
++	[ "$image_magic" != "$board_magic" ] && {
++		echo "Invalid image magic '$image_magic'. Expected '$board_magic'."
++		return 1
++	}
++
++	local model_string="$(tplink_pharos_v2_get_model_string)"
++	local line
++
++	# Here $1 is given to dd directly instead of get_image as otherwise the skip
++	# will take almost a second (as dd can't seek then)
++	#
++	# This will fail if the image isn't local, but that's fine: as the
++	# read loop won't be executed at all, it will return true, so the image
++	# is accepted (loading the first 1.5M of a remote image for this check seems
++	# a bit extreme)
 +	dd if="$1" bs=1 skip=1511432 count=1024 2>/dev/null | tr -d '\0\xff\r' | while read line; do
- 		[ "$line" = "$model_string" ] && break
- 	done || {
- 		echo "Unsupported image (model not in support-list)"
-@@ -492,7 +493,13 @@ platform_check_image() {
++		[ "$line" = "$model_string" ] && break
++	done || {
++		echo "Unsupported image (model not in support-list)"
++		return 1
++	}
++
++	return 0
++}
++
+ seama_get_type_magic() {
+ 	get_image "$@" | dd bs=1 count=4 skip=53 2>/dev/null | hexdump -v -n 4 -e '1/1 "%02x"'
+ }
+@@ -500,7 +529,13 @@ platform_check_image() {
  	eap120|\
  	wbs210|\
  	wbs510)
@@ -100,7 +152,7 @@ index e748a2559cdb3a0ca6618429b0f613a656e39388..5e740fcabba6b37d96b9d5d66d6b4b73
 +		;;
 +	cpe210v2)
 +		# magic = mktplinkfw v1 header
-+		tplink_pharos_check_image "$1" "01000000" && return 0
++		tplink_pharos_v2_check_image "$1" "01000000" && return 0
  		return 1
  		;;
  	a40|\

@@ -277,7 +277,7 @@ index 50b90b375f611d78b90e7e6dd9c1228e8c09d28a..00000000000000000000000000000000
 - struct Qdisc *qdisc_alloc(struct netdev_queue *dev_queue,
 diff --git a/target/linux/generic/patches-4.4/662-use_fq_codel_by_default.patch b/target/linux/generic/patches-4.4/662-use_fq_codel_by_default.patch
 deleted file mode 100644
-index 9d1962caa93f5543188809dff589750dce9d81f0..0000000000000000000000000000000000000000
+index 8d70b82350ee42ba7e1e1ab41b7d9555d70b719a..0000000000000000000000000000000000000000
 --- a/target/linux/generic/patches-4.4/662-use_fq_codel_by_default.patch
 +++ /dev/null
 @@ -1,95 +0,0 @@
@@ -296,7 +296,7 @@ index 9d1962caa93f5543188809dff589750dce9d81f0..00000000000000000000000000000000
 - 	  device, it has to decide which ones to send first, which ones to
 ---- a/net/sched/sch_fq_codel.c
 -+++ b/net/sched/sch_fq_codel.c
--@@ -688,7 +688,7 @@ static const struct Qdisc_class_ops fq_c
+-@@ -694,7 +694,7 @@ static const struct Qdisc_class_ops fq_c
 - 	.walk		=	fq_codel_walk,
 - };
 - 
@@ -305,7 +305,7 @@ index 9d1962caa93f5543188809dff589750dce9d81f0..00000000000000000000000000000000
 - 	.cl_ops		=	&fq_codel_class_ops,
 - 	.id		=	"fq_codel",
 - 	.priv_size	=	sizeof(struct fq_codel_sched_data),
--@@ -704,6 +704,7 @@ static struct Qdisc_ops fq_codel_qdisc_o
+-@@ -710,6 +710,7 @@ static struct Qdisc_ops fq_codel_qdisc_o
 - 	.dump_stats =	fq_codel_dump_stats,
 - 	.owner		=	THIS_MODULE,
 - };
