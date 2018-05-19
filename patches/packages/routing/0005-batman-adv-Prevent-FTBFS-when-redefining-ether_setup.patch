@@ -1,0 +1,25 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sat, 12 Aug 2017 08:54:47 +0200
+Subject: batman-adv: Prevent FTBFS when redefining ether_setup
+
+batman-adv must make sure that ether_setup is already declared via
+linux/netdevice.h before the preprocessor can patch the use of it in
+batman-adv. Otherwise it is tried to also patch the declaration of
+ether_setup.
+
+Fixes: 8da2f5cbb128 ("batman-adv: upgrade package to latest release 2017.2")
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batman-adv/files/compat-hacks.h b/batman-adv/files/compat-hacks.h
+index b8bcf72325fa5af9ad5acedb487dff12e21a4847..4ae2bcc7c26e83bfbda9ff288bc88b4f10c3fa75 100644
+--- a/batman-adv/files/compat-hacks.h
++++ b/batman-adv/files/compat-hacks.h
+@@ -228,6 +228,8 @@ static inline int batadv_nla_put_u64_64bit(struct sk_buff *skb, int attrtype,
+ 
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 9)
+ 
++#include <linux/netdevice.h>
++
+ /* work around missing attribute needs_free_netdev and priv_destructor in
+  * net_device
+  */

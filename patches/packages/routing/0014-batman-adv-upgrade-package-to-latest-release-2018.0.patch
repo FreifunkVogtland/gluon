@@ -1,0 +1,115 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 27 Feb 2018 13:59:03 +0100
+Subject: batman-adv: upgrade package to latest release 2018.0
+
+* support latest kernels (3.2 - 4.16)
+* coding style cleanups and refactoring
+* mark licenses clearer, change UAPI header from ISC to MIT
+* bugs squashed:
+
+  - fix packet checksum handling in receive path
+  - fix handling of large number of interfaces
+  - fix netlink dumping of gateways and BLA claims+backbones
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batman-adv/Makefile b/batman-adv/Makefile
+index 58f2806c865d24898aa9164035606dd5754350d7..3fd463bdeefc1b263dfe636953bf59531785a66f 100644
+--- a/batman-adv/Makefile
++++ b/batman-adv/Makefile
+@@ -9,10 +9,10 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=batman-adv
+ 
+-PKG_VERSION:=2017.4
++PKG_VERSION:=2018.0
+ PKG_RELEASE:=0
+-PKG_MD5SUM:=5d5a845725ccc89255c9e8a714db4b75
+-PKG_HASH:=8a50ffacd2bd5b65b2987eb2ae06fb9338c6af46935ec38ba869cca545719a4c
++PKG_MD5SUM:=c39d67cdb5509bf638efc9083e0dd41e
++PKG_HASH:=4826f838e8a2914a9470da25ea2f17f6325c464a130093b20dc7fb4e93f7576c
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)
+diff --git a/batman-adv/files/compat-hacks.h b/batman-adv/files/compat-hacks.h
+index a27408d1153dce7099f7746347cc43838b5bc6b8..d7f30ada4507f953ddd9513714d9b4d58a5d1d13 100644
+--- a/batman-adv/files/compat-hacks.h
++++ b/batman-adv/files/compat-hacks.h
+@@ -333,6 +333,16 @@ static inline void timer_setup(struct timer_list *timer,
+ 	container_of(callback_timer, typeof(*var), timer_fieldname)
+ 
+ #endif /* !from_timer */
++	
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
++
++#ifdef __CHECK_POLL
++typedef unsigned __bitwise __poll_t;
++#else
++typedef unsigned __poll_t;
++#endif
++
++#endif /* < KERNEL_VERSION(4, 16, 0) */
+ 
+ /* <DECLARE_EWMA> */
+ 
+@@ -392,7 +402,7 @@ static inline void timer_setup(struct timer_list *timer,
+ 	static inline void ewma_##name##_add(struct ewma_##name *e,	\
+ 					     unsigned long val)		\
+ 	{								\
+-		unsigned long internal = ACCESS_ONCE(e->internal);	\
++		unsigned long internal = READ_ONCE(e->internal);	\
+ 		unsigned long weight_rcp = ilog2(_weight_rcp);		\
+ 		unsigned long precision = _precision;			\
+ 									\
+@@ -401,10 +411,10 @@ static inline void timer_setup(struct timer_list *timer,
+ 		BUILD_BUG_ON((_precision) > 30);			\
+ 		BUILD_BUG_ON_NOT_POWER_OF_2(_weight_rcp);		\
+ 									\
+-		ACCESS_ONCE(e->internal) = internal ?			\
++		WRITE_ONCE(e->internal, internal ?			\
+ 			(((internal << weight_rcp) - internal) +	\
+ 				(val << precision)) >> weight_rcp :	\
+-			(val << precision);				\
++			(val << precision));				\
+ 	}
+ 
+ /* </DECLARE_EWMA> */
+diff --git a/batman-adv/patches/0001-compat-hacks.patch b/batman-adv/patches/0001-compat-hacks.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a9994d8af3f6c902f6bce8a7bd4a6e3cf289ce7
+--- /dev/null
++++ b/batman-adv/patches/0001-compat-hacks.patch
+@@ -0,0 +1,33 @@
++--- a/net/batman-adv/main.c
+++++ b/net/batman-adv/main.c
++@@ -19,7 +19,7 @@
++ #include "main.h"
++ 
++ #include <linux/atomic.h>
++-#include <linux/build_bug.h>
+++#include <linux/bug.h>
++ #include <linux/byteorder/generic.h>
++ #include <linux/crc32c.h>
++ #include <linux/errno.h>
++--- a/net/batman-adv/tp_meter.c
+++++ b/net/batman-adv/tp_meter.c
++@@ -20,7 +20,7 @@
++ #include "main.h"
++ 
++ #include <linux/atomic.h>
++-#include <linux/build_bug.h>
+++#include <linux/bug.h>
++ #include <linux/byteorder/generic.h>
++ #include <linux/cache.h>
++ #include <linux/compiler.h>
++--- a/net/batman-adv/translation-table.c
+++++ b/net/batman-adv/translation-table.c
++@@ -21,7 +21,7 @@
++ 
++ #include <linux/atomic.h>
++ #include <linux/bitops.h>
++-#include <linux/build_bug.h>
+++#include <linux/bug.h>
++ #include <linux/byteorder/generic.h>
++ #include <linux/cache.h>
++ #include <linux/compiler.h>

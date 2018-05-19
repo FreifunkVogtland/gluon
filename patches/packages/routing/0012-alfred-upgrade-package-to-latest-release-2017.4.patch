@@ -1,0 +1,32 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 5 Dec 2017 19:20:24 +0100
+Subject: alfred: upgrade package to latest release 2017.4
+
+* synchronization of batman-adv netlink header
+* coding style cleanups and refactoring
+* documentation cleanup
+* bugs squashed:
+
+  - only query debugfs when netlink failed
+  - handle allocation errors in hashtable iterator
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/alfred/Makefile b/alfred/Makefile
+index 6dc795c432d8d4bef634ee4f3c7cb470de519892..7be04a62601225583fc74aff8c89898622fd56e6 100644
+--- a/alfred/Makefile
++++ b/alfred/Makefile
+@@ -8,10 +8,10 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=alfred
+-PKG_VERSION:=2017.3
++PKG_VERSION:=2017.4
+ PKG_RELEASE:=0
+-PKG_MD5SUM:=f1a80c7fcd9b1d2c211ca1b2fe504a24
+-PKG_HASH:=c2963523ba86746476db9bbd820b7956761b362d5daa392d9ed471786eaf0208
++PKG_MD5SUM:=b7bf677b28ad25df2cbc5c0fadaa204c
++PKG_HASH:=c4ea1afa75628667693d14ee95f08c9943b9f0001b8c442c9a2974f26c75dc88
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)

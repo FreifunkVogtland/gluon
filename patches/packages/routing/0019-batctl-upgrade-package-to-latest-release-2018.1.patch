@@ -1,0 +1,27 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Wed, 25 Apr 2018 21:18:00 +0200
+Subject: batctl: upgrade package to latest release 2018.1
+
+* synchronization of batman-adv netlink and packet headers
+* add DAT cache and multicast flags netlink support
+* disable translation support for non-unicast mac addresses
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batctl/Makefile b/batctl/Makefile
+index de28f69890e34db0f40f191919766d890350e93b..ae878a6c8875b4856bb3f1a37e41c0871a3cb815 100644
+--- a/batctl/Makefile
++++ b/batctl/Makefile
+@@ -9,10 +9,9 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=batctl
+ 
+-PKG_VERSION:=2018.0
++PKG_VERSION:=2018.1
+ PKG_RELEASE:=0
+-PKG_MD5SUM:=cfdad757be0a2001158410366f6b9a45
+-PKG_HASH:=5a970835b6c85e92a4faf2c40d70664cf80637749c30b898d0c84cfe94f1eff4
++PKG_HASH:=27877d0da6916f88a6cecbbb3f3d23cc4558ef7c7294324bf4fd050ed606b553
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)

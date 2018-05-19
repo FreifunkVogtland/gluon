@@ -1,0 +1,106 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 5 Dec 2017 19:11:26 +0100
+Subject: batman-adv: upgrade package to latest release 2017.4
+
+* support latest kernels (3.2 - 4.15)
+* coding style cleanups and refactoring
+* documentation cleanup
+* bugs squashed:
+
+  - avoid spurious warnings from bat_v neigh_cmp implementation
+  - fix check of gateway availability in B.A.T.M.A.N. V
+  - fix locking for bidirectional TQ check counters
+  - remove leak of stack bits in fragmentation header priority
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batman-adv/Makefile b/batman-adv/Makefile
+index adf2aa636a27895533bfc645e1d069344504a1f7..58f2806c865d24898aa9164035606dd5754350d7 100644
+--- a/batman-adv/Makefile
++++ b/batman-adv/Makefile
+@@ -9,10 +9,10 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=batman-adv
+ 
+-PKG_VERSION:=2017.3
++PKG_VERSION:=2017.4
+ PKG_RELEASE:=0
+-PKG_MD5SUM:=67e41bda39895c1ac5fe540ada367139
+-PKG_HASH:=830edd297ff11b91623e9612172db3e2b2c1524e2f9b2ca1cb243e2e3f0ba4d4
++PKG_MD5SUM:=5d5a845725ccc89255c9e8a714db4b75
++PKG_HASH:=8a50ffacd2bd5b65b2987eb2ae06fb9338c6af46935ec38ba869cca545719a4c
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)
+diff --git a/batman-adv/files/compat-hacks.h b/batman-adv/files/compat-hacks.h
+index 9675ad84031a8e0c17e02e6d3d6259862c2f4c26..a5277c8e48d24064a89e233527416b39dd603b79 100644
+--- a/batman-adv/files/compat-hacks.h
++++ b/batman-adv/files/compat-hacks.h
+@@ -22,9 +22,10 @@
+ 
+ #include <linux/netdevice.h>
+ 
+-#define netdev_master_upper_dev_link(dev, upper_dev, upper_priv, upper_info) ({\
++#define netdev_master_upper_dev_link(dev, upper_dev, upper_priv, upper_info, extack) ({\
+ 	BUILD_BUG_ON(upper_priv != NULL); \
+ 	BUILD_BUG_ON(upper_info != NULL); \
++	BUILD_BUG_ON(extack != NULL); \
+ 	netdev_set_master(dev, upper_dev); \
+ })
+ 
+@@ -32,12 +33,22 @@
+ 
+ #include <linux/netdevice.h>
+ 
+-#define netdev_master_upper_dev_link(dev, upper_dev, upper_priv, upper_info) ({\
++#define netdev_master_upper_dev_link(dev, upper_dev, upper_priv, upper_info, extack) ({\
+ 	BUILD_BUG_ON(upper_priv != NULL); \
+ 	BUILD_BUG_ON(upper_info != NULL); \
++	BUILD_BUG_ON(extack != NULL); \
+ 	netdev_master_upper_dev_link(dev, upper_dev); \
+ })
+ 
++#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
++
++#include <linux/netdevice.h>
++
++#define netdev_master_upper_dev_link(dev, upper_dev, upper_priv, upper_info, extack) ({\
++	BUILD_BUG_ON(extack != NULL); \
++	netdev_master_upper_dev_link(dev, upper_dev, upper_priv, upper_info); \
++})
++
+ #endif /* < KERNEL_VERSION(4, 5, 0) */
+ 
+ 
+@@ -298,6 +309,31 @@ static inline void *batadv_skb_put_data(struct sk_buff *skb, const void *data,
+ 
+ #endif /* < KERNEL_VERSION(4, 13, 0) */
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
++
++#define batadv_softif_slave_add(__dev, __slave_dev, __extack) \
++	batadv_softif_slave_add(__dev, __slave_dev)
++
++#endif /* < KERNEL_VERSION(4, 15, 0) */
++
++#ifndef from_timer
++
++#define TIMER_DATA_TYPE                unsigned long
++#define TIMER_FUNC_TYPE                void (*)(TIMER_DATA_TYPE)
++
++static inline void 	(struct timer_list *timer,
++			       void (*callback)(struct timer_list *),
++			       unsigned int flags)
++{
++	__setup_timer(timer, (TIMER_FUNC_TYPE)callback,
++		      (TIMER_DATA_TYPE)timer, flags);
++}
++
++#define from_timer(var, callback_timer, timer_fieldname) \
++	container_of(callback_timer, typeof(*var), timer_fieldname)
++
++#endif /* !from_timer */
++
+ /* <DECLARE_EWMA> */
+ 
+ #include <linux/version.h>

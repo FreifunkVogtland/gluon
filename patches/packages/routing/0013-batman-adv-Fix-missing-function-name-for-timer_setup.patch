@@ -1,0 +1,19 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 26 Dec 2017 11:52:22 +0100
+Subject: batman-adv: Fix missing function name for timer_setup
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batman-adv/files/compat-hacks.h b/batman-adv/files/compat-hacks.h
+index a5277c8e48d24064a89e233527416b39dd603b79..a27408d1153dce7099f7746347cc43838b5bc6b8 100644
+--- a/batman-adv/files/compat-hacks.h
++++ b/batman-adv/files/compat-hacks.h
+@@ -321,7 +321,7 @@ static inline void *batadv_skb_put_data(struct sk_buff *skb, const void *data,
+ #define TIMER_DATA_TYPE                unsigned long
+ #define TIMER_FUNC_TYPE                void (*)(TIMER_DATA_TYPE)
+ 
+-static inline void 	(struct timer_list *timer,
++static inline void timer_setup(struct timer_list *timer,
+ 			       void (*callback)(struct timer_list *),
+ 			       unsigned int flags)
+ {

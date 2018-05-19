@@ -1,0 +1,28 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 27 Feb 2018 13:59:55 +0100
+Subject: batctl: upgrade package to latest release 2018.0
+
+* synchronization of batman-adv netlink and packet headers
+* mark licenses clearer, change batman-adv UAPI header from ISC to MIT
+* coding style cleanups and refactoring
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batctl/Makefile b/batctl/Makefile
+index b3647142b79a0a748eab04d52bf167c87ca19010..de28f69890e34db0f40f191919766d890350e93b 100644
+--- a/batctl/Makefile
++++ b/batctl/Makefile
+@@ -9,10 +9,10 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=batctl
+ 
+-PKG_VERSION:=2017.4
++PKG_VERSION:=2018.0
+ PKG_RELEASE:=0
+-PKG_MD5SUM:=142d5b0b4a9efebfe781ed28beb7d7ce
+-PKG_HASH:=047d6aac4da51dbfb5721df0bbc9b1699c8431e4707157f939c6d6c4f214e464
++PKG_MD5SUM:=cfdad757be0a2001158410366f6b9a45
++PKG_HASH:=5a970835b6c85e92a4faf2c40d70664cf80637749c30b898d0c84cfe94f1eff4
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)

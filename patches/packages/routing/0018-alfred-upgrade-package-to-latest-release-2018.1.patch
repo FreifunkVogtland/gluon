@@ -1,0 +1,25 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Wed, 25 Apr 2018 21:17:08 +0200
+Subject: alfred: upgrade package to latest release 2018.1
+
+* synchronization of batman-adv netlink header
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/alfred/Makefile b/alfred/Makefile
+index 7ff77efc48110bc609533a862c810b7d839f5a45..a0d25a5e932d4aac15e5e66e5dd7156417eb85f7 100644
+--- a/alfred/Makefile
++++ b/alfred/Makefile
+@@ -8,10 +8,9 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=alfred
+-PKG_VERSION:=2018.0
++PKG_VERSION:=2018.1
+ PKG_RELEASE:=0
+-PKG_MD5SUM:=a0610a85cd55b9b1ff30b726dc5c455f
+-PKG_HASH:=c7cfeb6defc46fe0da9d620afcf89ee36ddc034e31dee58cc239b757a77cf257
++PKG_HASH:=808fa6acf65c7a8e26405115176a5587157f746108cbe5dd974788eb05416d76
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)

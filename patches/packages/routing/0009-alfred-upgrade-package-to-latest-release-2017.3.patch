@@ -1,0 +1,26 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Thu, 28 Sep 2017 18:37:30 +0200
+Subject: alfred: upgrade package to latest release 2017.3
+
+ * reduction of memory usage when using --update-command
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/alfred/Makefile b/alfred/Makefile
+index 0af4221228e41c008973eaf9fa930056f61d51bd..6dc795c432d8d4bef634ee4f3c7cb470de519892 100644
+--- a/alfred/Makefile
++++ b/alfred/Makefile
+@@ -8,10 +8,10 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=alfred
+-PKG_VERSION:=2017.2
++PKG_VERSION:=2017.3
+ PKG_RELEASE:=0
+-PKG_MD5SUM:=9e2090e043b940a8765ba17394606896
+-PKG_HASH:=3d5256abe298f7ee266f9d2a0c41b0878e81bc5c8413c4f66cf8813e7f7f4a03
++PKG_MD5SUM:=f1a80c7fcd9b1d2c211ca1b2fe504a24
++PKG_HASH:=c2963523ba86746476db9bbd820b7956761b362d5daa392d9ed471786eaf0208
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)
