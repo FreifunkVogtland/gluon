@@ -3,7 +3,7 @@ Date: Thu, 21 Dec 2017 12:07:43 +0100
 Subject: ar71xx: add support for TP-Link CPE210 v2
 
 diff --git a/target/linux/ar71xx/base-files/etc/board.d/01_leds b/target/linux/ar71xx/base-files/etc/board.d/01_leds
-index e67b5e38561e841b88e486341950c52e1d454322..121b182d9f2d63407a83a576212feabd3fc55cb8 100755
+index 6007d41f869a40ef014866b54882ed1622336658..5629bad56986fdca4327ba0535b4213af5ef243c 100755
 --- a/target/linux/ar71xx/base-files/etc/board.d/01_leds
 +++ b/target/linux/ar71xx/base-files/etc/board.d/01_leds
 @@ -184,6 +184,14 @@ wbs510)
@@ -22,7 +22,7 @@ index e67b5e38561e841b88e486341950c52e1d454322..121b182d9f2d63407a83a576212feabd
  	ucidef_set_led_netdev "wan" "WAN" "pcs:blue:wan" "eth1"
  	ucidef_set_led_switch "lan1" "LAN1" "pcs:blue:lan1" "switch0" "0x04"
 diff --git a/target/linux/ar71xx/base-files/etc/board.d/02_network b/target/linux/ar71xx/base-files/etc/board.d/02_network
-index 454abe6a5005621967dd96e0282e7bce2a0b127e..5fc4684e14bcb0834a5517bb04d161f75568aeb0 100755
+index 92946e5014be335377ba0938cb312c16f206d244..4b7c66cc27f2290e2bf58004ec08534a6427b237 100755
 --- a/target/linux/ar71xx/base-files/etc/board.d/02_network
 +++ b/target/linux/ar71xx/base-files/etc/board.d/02_network
 @@ -67,6 +67,7 @@ ar71xx_setup_interfaces()
@@ -34,10 +34,10 @@ index 454abe6a5005621967dd96e0282e7bce2a0b127e..5fc4684e14bcb0834a5517bb04d161f7
  	eap300v2|\
  	eap7660d|\
 diff --git a/target/linux/ar71xx/base-files/lib/ar71xx.sh b/target/linux/ar71xx/base-files/lib/ar71xx.sh
-index 8f8158bac8a28db4f4f15ce5c37f48a21084dc03..d0a92580cebd42b71f6bca32de952786579668d9 100755
+index ae1e0373eaa98b9b423e328a53d1780d6b400539..bfc552d125074907d7ac31ee8e154c8db45c22d0 100755
 --- a/target/linux/ar71xx/base-files/lib/ar71xx.sh
 +++ b/target/linux/ar71xx/base-files/lib/ar71xx.sh
-@@ -350,11 +350,11 @@ tplink_pharos_get_model_string() {
+@@ -371,11 +371,11 @@ tplink_pharos_get_model_string() {
  
  	# The returned string will end with \r\n, but we don't remove it here
  	# to simplify matching against it in the sysupgrade image check
@@ -51,7 +51,7 @@ index 8f8158bac8a28db4f4f15ce5c37f48a21084dc03..d0a92580cebd42b71f6bca32de952786
  	local oIFS="$IFS"; IFS=":"; set -- $model_string; IFS="$oIFS"
  
  	local model="${1%%\(*}"
-@@ -375,6 +375,25 @@ gl_inet_board_detect() {
+@@ -396,6 +396,25 @@ gl_inet_board_detect() {
  	esac
  }
  
@@ -77,7 +77,7 @@ index 8f8158bac8a28db4f4f15ce5c37f48a21084dc03..d0a92580cebd42b71f6bca32de952786
  ar71xx_board_detect() {
  	local machine
  	local name
-@@ -515,6 +534,10 @@ ar71xx_board_detect() {
+@@ -539,6 +558,10 @@ ar71xx_board_detect() {
  		name="cpe210"
  		tplink_pharos_board_detect
  		;;
@@ -89,7 +89,7 @@ index 8f8158bac8a28db4f4f15ce5c37f48a21084dc03..d0a92580cebd42b71f6bca32de952786
  		name="cpe510"
  		tplink_pharos_board_detect
 diff --git a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
-index 774e3c8964ef724d1efbae56434aeaa9f1c298a4..1ac73cb7fdc9a6be508ba1d806f3589cfa01e921 100755
+index 203d910e02d8e482c9216675a280b7c3710c85c7..720fc27a6dcad8c9bcd51472c465b47c5c7bf975 100755
 --- a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
 +++ b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
 @@ -110,9 +110,10 @@ tplink_pharos_check_support_list() {
@@ -141,7 +141,7 @@ index 774e3c8964ef724d1efbae56434aeaa9f1c298a4..1ac73cb7fdc9a6be508ba1d806f3589c
  seama_get_type_magic() {
  	get_image "$@" | dd bs=1 count=4 skip=53 2>/dev/null | hexdump -v -n 4 -e '1/1 "%02x"'
  }
-@@ -500,7 +529,13 @@ platform_check_image() {
+@@ -503,7 +532,13 @@ platform_check_image() {
  	eap120|\
  	wbs210|\
  	wbs510)
@@ -157,10 +157,10 @@ index 774e3c8964ef724d1efbae56434aeaa9f1c298a4..1ac73cb7fdc9a6be508ba1d806f3589c
  		;;
  	a40|\
 diff --git a/target/linux/ar71xx/files/arch/mips/ath79/Kconfig.openwrt b/target/linux/ar71xx/files/arch/mips/ath79/Kconfig.openwrt
-index 7ad5419f51ec9909d8b59f33178221a7d81ec184..0ced37a3a815728ded117d8df0dd2e2adc943885 100644
+index 6e9d129e128f88bcfd2781104fa385cb939127b6..aab0b3c447c0af69b8421c6c5b2ec33bcaeee4a9 100644
 --- a/target/linux/ar71xx/files/arch/mips/ath79/Kconfig.openwrt
 +++ b/target/linux/ar71xx/files/arch/mips/ath79/Kconfig.openwrt
-@@ -1258,6 +1258,7 @@ config ATH79_MACH_ARCHER_C7
+@@ -1270,6 +1270,7 @@ config ATH79_MACH_ARCHER_C7
  config ATH79_MACH_CPE510
  	bool "TP-LINK CPE510 support"
  	select SOC_AR934X
@@ -275,10 +275,10 @@ index d2dbed1fe286c44d3188262e984253faaee7edba..64805938c40580513324cdf13c5840d7
  	     cpe510_setup);
  
 diff --git a/target/linux/ar71xx/files/arch/mips/ath79/machtypes.h b/target/linux/ar71xx/files/arch/mips/ath79/machtypes.h
-index 9cb4a7f2e1df641232289721b676a9b0149c76e5..060fe72f6685b7230056aa02b9c9728c8ad9f6bd 100644
+index 701608294fa462d06cc3ed421c2698d475e5061b..f7dd1a7803e8a1f7a57a2cee25958d839a23d8fc 100644
 --- a/target/linux/ar71xx/files/arch/mips/ath79/machtypes.h
 +++ b/target/linux/ar71xx/files/arch/mips/ath79/machtypes.h
-@@ -60,7 +60,8 @@ enum ath79_mach_type {
+@@ -61,7 +61,8 @@ enum ath79_mach_type {
  	ATH79_MACH_CF_E380AC_V2,		/* COMFAST CF-E380AC v2 */
  	ATH79_MACH_CF_E520N,			/* COMFAST CF-E520N */
  	ATH79_MACH_CF_E530N,			/* COMFAST CF-E530N */
@@ -289,7 +289,7 @@ index 9cb4a7f2e1df641232289721b676a9b0149c76e5..060fe72f6685b7230056aa02b9c9728c
  	ATH79_MACH_CPE830,			/* YunCore CPE830 */
  	ATH79_MACH_CPE870,			/* YunCore CPE870 */
 diff --git a/target/linux/ar71xx/image/tp-link.mk b/target/linux/ar71xx/image/tp-link.mk
-index 5be7cbfbd4ab7d73d679d52d2581459250e04302..d71881fe43869150316178c40377615b3f4599bd 100644
+index 13197be6325c7de2f0a77e44203cf387b87e3eb6..405693c17811c1a1e6216800a0a0ac277154b2bc 100644
 --- a/target/linux/ar71xx/image/tp-link.mk
 +++ b/target/linux/ar71xx/image/tp-link.mk
 @@ -142,6 +142,18 @@ $(Device/cpe510-520)
@@ -386,7 +386,7 @@ index 0000000000000000000000000000000000000000..e38e7f8e132df213bdd3e4fcde204ccc
 + 
 + 	ath79_wmac_data.get_mac_revision = ar93xx_get_soc_revision;
 diff --git a/tools/firmware-utils/src/tplink-safeloader.c b/tools/firmware-utils/src/tplink-safeloader.c
-index 478d5d8e9b43bbe37694732c138048c8fe8d807c..dcafbad7e241a2cf38a2888b7fec1e775363bbe5 100644
+index fec830c23ce6707755ddefc849f195872be1e877..1e6be5817275a239c2854782a0b74e9dcf9ee348 100644
 --- a/tools/firmware-utils/src/tplink-safeloader.c
 +++ b/tools/firmware-utils/src/tplink-safeloader.c
 @@ -154,6 +154,47 @@ static struct device_info boards[] = {
