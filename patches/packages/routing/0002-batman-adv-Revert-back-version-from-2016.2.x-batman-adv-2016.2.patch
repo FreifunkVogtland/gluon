@@ -1,0 +1,1830 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sat, 2 Jun 2018 09:49:32 +0200
+Subject: batman-adv: Revert back version from 2016.2.x (batman-adv 2016.2)
+
+diff --git a/batctl/Makefile b/batctl/Makefile
+index 433f0dfc7c781412cf2d9ae467684232948af521..174b18eafaec671ada029beeda3ac0c87d7786f8 100644
+--- a/batctl/Makefile
++++ b/batctl/Makefile
+@@ -9,10 +9,9 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=batctl
+ 
+-PKG_VERSION:=2017.2
++PKG_VERSION:=2016.2
+ PKG_RELEASE:=0
+-PKG_MD5SUM:=be82ff074beb2fdb160b54d4e579fbed
+-PKG_HASH:=c460d0910d03916e2cb43b60ca427d0101474680cfc096cc2d28a259a94f536c
++PKG_MD5SUM:=50f42d06611afae58ccfcde502f94c1a
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)
+@@ -26,9 +25,9 @@ define Package/batctl
+   URL:=https://www.open-mesh.org/
+   SECTION:=net
+   CATEGORY:=Network
+-  DEPENDS:=+kmod-batman-adv +libnl-tiny +libc +librt
++  DEPENDS:=+kmod-batman-adv +libnl-tiny +libc
+   TITLE:=B.A.T.M.A.N. Advanced user space configuration tool batctl
+-  MAINTAINER:=Simon Wunderlich <sw@simonwunderlich.de>
++  MAINTAINER:=Marek Lindner <mareklindner@neomailbox.ch>
+ endef
+ 
+ define Package/batctl/description
+@@ -56,8 +55,7 @@ MAKE_BATCTL_ENV += \
+         CPPFLAGS="$(TARGET_CPPFLAGS)" \
+         CFLAGS="$(TARGET_CFLAGS)" \
+         LDFLAGS="$(TARGET_LDFLAGS)" \
+-        LIBNL_NAME="libnl-tiny" \
+-        LIBNL_GENL_NAME="libnl-tiny"
++        LIBNL_NAME="libnl-tiny"
+ 
+ MAKE_BATCTL_ARGS += \
+         REVISION="$(PKG_BATCTL_SHORTREV)" \
+diff --git a/batman-adv/Config.in b/batman-adv/Config.in
+index 1b2399fc0ba6fecb8b9dd7c1abf3a0d791ae4621..48092e71d37c090bda01eec5184b9728a8b36702 100644
+--- a/batman-adv/Config.in
++++ b/batman-adv/Config.in
+@@ -14,11 +14,6 @@ config KMOD_BATMAN_ADV_DAT
+ 	depends on PACKAGE_kmod-batman-adv
+ 	default y
+ 
+-config KMOD_BATMAN_ADV_DEBUGFS
+-	bool "enable debugfs support"
+-	depends on PACKAGE_kmod-batman-adv
+-	default y
+-
+ config KMOD_BATMAN_ADV_MCAST
+ 	bool "enable multicast transmission optimization"
+ 	depends on PACKAGE_kmod-batman-adv
+@@ -32,4 +27,4 @@ config KMOD_BATMAN_ADV_NC
+ config KMOD_BATMAN_ADV_BATMAN_V
+ 	bool "enable batman v routing algorithm"
+ 	depends on PACKAGE_kmod-batman-adv
+-	default y
++	default n
+diff --git a/batman-adv/Makefile b/batman-adv/Makefile
+index d51bc65bbdc9d1511d4f0bbc9d3a8a13ebc34201..c45cbb4883f6a2761df700894e819ecb7aa50f84 100644
+--- a/batman-adv/Makefile
++++ b/batman-adv/Makefile
+@@ -4,26 +4,28 @@
+ # This is free software, licensed under the GNU General Public License v2.
+ # See /LICENSE for more information.
+ #
++# $Id: Makefile 5624 2006-11-23 00:29:07Z nbd $
+ 
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=batman-adv
+ 
+-PKG_VERSION:=2017.2
++PKG_VERSION:=2016.2
+ PKG_RELEASE:=1
+-PKG_MD5SUM:=937b5f1d0188e3522d67ad45ee0a4f5a
+-PKG_HASH:=d487974e21cb53d39f139e93a2cf297807df5b7bf63ba6d810bad6d91537394f
++PKG_MD5SUM:=dd1ab664475902fc3dbf34998bbe5a90
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)
+ PKG_LICENSE:=GPL-2.0
+ 
+-include $(INCLUDE_DIR)/kernel.mk
++PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)/$(PKG_NAME)-$(PKG_VERSION)
++
+ include $(INCLUDE_DIR)/package.mk
++include $(INCLUDE_DIR)/kernel.mk
+ 
+ define KernelPackage/batman-adv
+   URL:=https://www.open-mesh.org/
+-  MAINTAINER:=Simon Wunderlich <sw@simonwunderlich.de>
++  MAINTAINER:=Marek Lindner <mareklindner@neomailbox.ch>
+   SUBMENU:=Network Support
+   DEPENDS:=+KMOD_BATMAN_ADV_BLA:kmod-lib-crc16 +kmod-crypto-crc32c +kmod-lib-crc32c +kmod-cfg80211
+   TITLE:=B.A.T.M.A.N. Adv
+@@ -48,7 +50,6 @@ endef
+ PKG_EXTRA_KCONFIG:= \
+ 	CONFIG_BATMAN_ADV=m \
+ 	CONFIG_BATMAN_ADV_DEBUG=$(if $(CONFIG_KMOD_BATMAN_ADV_DEBUG_LOG),y,n) \
+-	CONFIG_BATMAN_ADV_DEBUGFS=$(if $(CONFIG_KMOD_BATMAN_ADV_DEBUGFS),y,n) \
+ 	CONFIG_BATMAN_ADV_BLA=$(if $(CONFIG_KMOD_BATMAN_ADV_BLA),y,n) \
+ 	CONFIG_BATMAN_ADV_DAT=$(if $(CONFIG_KMOD_BATMAN_ADV_DAT),y,n) \
+ 	CONFIG_BATMAN_ADV_MCAST=$(if $(CONFIG_KMOD_BATMAN_ADV_MCAST),y,n) \
+@@ -61,22 +62,15 @@ PKG_EXTRA_CFLAGS:= \
+ 
+ NOSTDINC_FLAGS = \
+ 	-I$(PKG_BUILD_DIR)/net/batman-adv \
+-	-I$(STAGING_DIR)/usr/include/mac80211-backport \
+ 	-I$(STAGING_DIR)/usr/include/mac80211-backport/uapi \
+-	-I$(STAGING_DIR)/usr/include/mac80211 \
++	-I$(STAGING_DIR)/usr/include/mac80211-backport \
+ 	-I$(STAGING_DIR)/usr/include/mac80211/uapi \
+-	-I$(PKG_BUILD_DIR)/include/ \
++	-I$(STAGING_DIR)/usr/include/mac80211 \
+ 	-include backport/backport.h \
+ 	-include $(PKG_BUILD_DIR)/compat-hacks.h
+ 
+-COMPAT_SOURCES = \
+-	$(if $(CONFIG_KMOD_BATMAN_ADV_MCAST),../../compat-sources/net/core/skbuff.o,) \
+-	$(if $(CONFIG_KMOD_BATMAN_ADV_MCAST),../../compat-sources/net/ipv4/igmp.o,) \
+-	$(if $(CONFIG_KMOD_BATMAN_ADV_MCAST),../../compat-sources/net/ipv6/mcast_snoop.o,) \
+-
+ define Build/Compile
+-	+env "batman-adv-y=$(COMPAT_SOURCES)" \
+-	$(MAKE) $(PKG_JOBS) -C "$(LINUX_DIR)" \
++	+$(MAKE) $(PKG_JOBS) -C "$(LINUX_DIR)" \
+ 		ARCH="$(LINUX_KARCH)" \
+ 		CROSS_COMPILE="$(TARGET_CROSS)" \
+ 		SUBDIRS="$(PKG_BUILD_DIR)/net/batman-adv" \
+@@ -89,6 +83,8 @@ endef
+ define Build/Prepare
+ 	$(call Build/Prepare/Default)
+ 	$(CP) ./files/compat-hacks.h $(PKG_BUILD_DIR)/
++	$(SED) '/#define _NET_BATMAN_ADV_MAIN_H_/a\#undef CONFIG_MODULE_STRIPPED' \
++		$(PKG_BUILD_DIR)/net/batman-adv/main.h
+ endef
+ 
+ define Build/Clean
+diff --git a/batman-adv/files/compat-hacks.h b/batman-adv/files/compat-hacks.h
+index b8bcf72325fa5af9ad5acedb487dff12e21a4847..a910c2d9ae2db784656071119e85bf47db9988a2 100644
+--- a/batman-adv/files/compat-hacks.h
++++ b/batman-adv/files/compat-hacks.h
+@@ -1,7 +1,5 @@
+ /* Please avoid adding hacks here - instead add it to mac80211/backports.git */
+ 
+-#undef CONFIG_MODULE_STRIPPED
+-
+ #include <linux/version.h>	/* LINUX_VERSION_CODE */
+ #include <linux/types.h>
+ 
+@@ -11,13 +9,6 @@
+ 
+ #endif /* < KERNEL_VERSION(4, 1, 0) */
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0)
+-
+-/* Linux 3.15 misses the uapi include.... */
+-#include <uapi/linux/nl80211.h>
+-
+-#endif /* < KERNEL_VERSION(3, 16, 0) */
+-
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+ 
+ #include <linux/netdevice.h>
+@@ -41,40 +32,10 @@
+ #endif /* < KERNEL_VERSION(4, 5, 0) */
+ 
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)
+-
+-/* for batadv_v_elp_get_throughput which would have used
+- * STATION_INFO_EXPECTED_THROUGHPUT in Linux 4.0.0
+- */
+-#define NL80211_STA_INFO_EXPECTED_THROUGHPUT    28
+-
+-/* wild hack for batadv_getlink_net only */
+-#define get_link_net get_xstats_size || 1 ? fallback_net : (struct net*)netdev->rtnl_link_ops->get_xstats_size
+-
+-#endif /* < KERNEL_VERSION(4, 0, 0) */
+-
+-
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
+-
+-struct sk_buff *skb_checksum_trimmed(struct sk_buff *skb,
+-				     unsigned int transport_len,
+-				     __sum16(*skb_chkf)(struct sk_buff *skb));
+-
+-int ip_mc_check_igmp(struct sk_buff *skb, struct sk_buff **skb_trimmed);
+-
+-int ipv6_mc_check_mld(struct sk_buff *skb, struct sk_buff **skb_trimmed);
+-
+-#endif /* < KERNEL_VERSION(4, 2, 0) */
+-
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0)
+ 
+ #define IFF_NO_QUEUE	0; dev->tx_queue_len = 0
+ 
+-static inline bool hlist_fake(struct hlist_node *h)
+-{
+-	return h->pprev == &h->next;
+-}
+-
+ #endif /* < KERNEL_VERSION(4, 3, 0) */
+ 
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0)
+@@ -123,228 +84,3 @@ static inline void batadv_netif_trans_update(struct net_device *dev)
+ }
+ 
+ #endif /* < KERNEL_VERSION(4, 7, 0) */
+-
+-
+-#include_next <linux/netlink.h>
+-
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+-
+-#include_next <net/netlink.h>
+-
+-static inline bool batadv_nla_need_padding_for_64bit(struct sk_buff *skb);
+-
+-static inline int batadv_nla_align_64bit(struct sk_buff *skb, int padattr)
+-{
+-	if (batadv_nla_need_padding_for_64bit(skb) &&
+-	    !nla_reserve(skb, padattr, 0))
+-		return -EMSGSIZE;
+-
+-	return 0;
+-}
+-
+-static inline struct nlattr *batadv__nla_reserve_64bit(struct sk_buff *skb,
+-						       int attrtype,
+-						       int attrlen, int padattr)
+-{
+-	if (batadv_nla_need_padding_for_64bit(skb))
+-		batadv_nla_align_64bit(skb, padattr);
+-
+-	return __nla_reserve(skb, attrtype, attrlen);
+-}
+-
+-static inline void batadv__nla_put_64bit(struct sk_buff *skb, int attrtype,
+-					 int attrlen, const void *data,
+-					 int padattr)
+-{
+-	struct nlattr *nla;
+-
+-	nla = batadv__nla_reserve_64bit(skb, attrtype, attrlen, padattr);
+-	memcpy(nla_data(nla), data, attrlen);
+-}
+-
+-static inline bool batadv_nla_need_padding_for_64bit(struct sk_buff *skb)
+-{
+-#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+-	/* The nlattr header is 4 bytes in size, that's why we test
+-	 * if the skb->data _is_ aligned.  A NOP attribute, plus
+-	 * nlattr header for next attribute, will make nla_data()
+-	 * 8-byte aligned.
+-	 */
+-	if (IS_ALIGNED((unsigned long)skb_tail_pointer(skb), 8))
+-		return true;
+-#endif
+-	return false;
+-}
+-
+-static inline int batadv_nla_total_size_64bit(int payload)
+-{
+-	return NLA_ALIGN(nla_attr_size(payload))
+-#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+-		+ NLA_ALIGN(nla_attr_size(0))
+-#endif
+-		;
+-}
+-
+-static inline int batadv_nla_put_64bit(struct sk_buff *skb, int attrtype,
+-				       int attrlen, const void *data,
+-				       int padattr)
+-{
+-	size_t len;
+-
+-	if (batadv_nla_need_padding_for_64bit(skb))
+-		len = batadv_nla_total_size_64bit(attrlen);
+-	else
+-		len = nla_total_size(attrlen);
+-	if (unlikely(skb_tailroom(skb) < len))
+-		return -EMSGSIZE;
+-
+-	batadv__nla_put_64bit(skb, attrtype, attrlen, data, padattr);
+-	return 0;
+-}
+-
+-#define nla_put_u64_64bit(_skb, _attrtype, _value, _padattr) \
+-	batadv_nla_put_u64_64bit(_skb, _attrtype, _value, _padattr)
+-static inline int batadv_nla_put_u64_64bit(struct sk_buff *skb, int attrtype,
+-					   u64 value, int padattr)
+-{
+-	return batadv_nla_put_64bit(skb, attrtype, sizeof(u64), &value,
+-				    padattr);
+-}
+-
+-#endif /* < KERNEL_VERSION(4, 7, 0) */
+-
+-
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+-
+-#include_next <linux/cache.h>
+-
+-/* hack for netlink.c which marked the family ops as ro */
+-#ifdef __ro_after_init
+-#undef __ro_after_init
+-#endif
+-#define __ro_after_init
+-
+-#endif /* < KERNEL_VERSION(4, 10, 0) */
+-
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 9)
+-
+-/* work around missing attribute needs_free_netdev and priv_destructor in
+- * net_device
+- */
+-#define ether_setup(dev) \
+-	void batadv_softif_free2(struct net_device *dev) \
+-	{ \
+-		batadv_softif_free(dev); \
+-		free_netdev(dev); \
+-	} \
+-	void (*t1)(struct net_device *dev) __attribute__((unused)); \
+-	bool t2 __attribute__((unused)); \
+-	ether_setup(dev)
+-#define needs_free_netdev destructor = batadv_softif_free2; t2
+-#define priv_destructor destructor = batadv_softif_free2; t1
+-
+-#endif /* < KERNEL_VERSION(4, 11, 9) */
+-
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+-
+-static inline void *batadv_skb_put(struct sk_buff *skb, unsigned int len)
+-{
+-	return (void *)skb_put(skb, len);
+-}
+-#define skb_put batadv_skb_put
+-
+-static inline void *skb_put_zero(struct sk_buff *skb, unsigned int len)
+-{
+-	void *tmp = skb_put(skb, len);
+-
+-	memset(tmp, 0, len);
+-
+-	return tmp;
+-}
+-
+-static inline void *skb_put_data(struct sk_buff *skb, const void *data,
+-				 unsigned int len)
+-{
+-	void *tmp = skb_put(skb, len);
+-
+-	memcpy(tmp, data, len);
+-
+-	return tmp;
+-}
+-
+-#endif /* < KERNEL_VERSION(4, 13, 0) */
+-
+-/* <DECLARE_EWMA> */
+-
+-#include <linux/version.h>
+-#include_next <linux/average.h>
+-
+-#include <linux/bug.h>
+-
+-#ifdef DECLARE_EWMA
+-#undef DECLARE_EWMA
+-#endif /* DECLARE_EWMA */
+-
+-/*
+- * Exponentially weighted moving average (EWMA)
+- *
+- * This implements a fixed-precision EWMA algorithm, with both the
+- * precision and fall-off coefficient determined at compile-time
+- * and built into the generated helper funtions.
+- *
+- * The first argument to the macro is the name that will be used
+- * for the struct and helper functions.
+- *
+- * The second argument, the precision, expresses how many bits are
+- * used for the fractional part of the fixed-precision values.
+- *
+- * The third argument, the weight reciprocal, determines how the
+- * new values will be weighed vs. the old state, new values will
+- * get weight 1/weight_rcp and old values 1-1/weight_rcp. Note
+- * that this parameter must be a power of two for efficiency.
+- */
+-
+-#define DECLARE_EWMA(name, _precision, _weight_rcp)			\
+-	struct ewma_##name {						\
+-		unsigned long internal;					\
+-	};								\
+-	static inline void ewma_##name##_init(struct ewma_##name *e)	\
+-	{								\
+-		BUILD_BUG_ON(!__builtin_constant_p(_precision));	\
+-		BUILD_BUG_ON(!__builtin_constant_p(_weight_rcp));	\
+-		/*							\
+-		 * Even if you want to feed it just 0/1 you should have	\
+-		 * some bits for the non-fractional part...		\
+-		 */							\
+-		BUILD_BUG_ON((_precision) > 30);			\
+-		BUILD_BUG_ON_NOT_POWER_OF_2(_weight_rcp);		\
+-		e->internal = 0;					\
+-	}								\
+-	static inline unsigned long					\
+-	ewma_##name##_read(struct ewma_##name *e)			\
+-	{								\
+-		BUILD_BUG_ON(!__builtin_constant_p(_precision));	\
+-		BUILD_BUG_ON(!__builtin_constant_p(_weight_rcp));	\
+-		BUILD_BUG_ON((_precision) > 30);			\
+-		BUILD_BUG_ON_NOT_POWER_OF_2(_weight_rcp);		\
+-		return e->internal >> (_precision);			\
+-	}								\
+-	static inline void ewma_##name##_add(struct ewma_##name *e,	\
+-					     unsigned long val)		\
+-	{								\
+-		unsigned long internal = ACCESS_ONCE(e->internal);	\
+-		unsigned long weight_rcp = ilog2(_weight_rcp);		\
+-		unsigned long precision = _precision;			\
+-									\
+-		BUILD_BUG_ON(!__builtin_constant_p(_precision));	\
+-		BUILD_BUG_ON(!__builtin_constant_p(_weight_rcp));	\
+-		BUILD_BUG_ON((_precision) > 30);			\
+-		BUILD_BUG_ON_NOT_POWER_OF_2(_weight_rcp);		\
+-									\
+-		ACCESS_ONCE(e->internal) = internal ?			\
+-			(((internal << weight_rcp) - internal) +	\
+-				(val << precision)) >> weight_rcp :	\
+-			(val << precision);				\
+-	}
+-
+-/* </DECLARE_EWMA> */
+diff --git a/batman-adv/files/etc/config/batman-adv b/batman-adv/files/etc/config/batman-adv
+index 97be6223524e912c4d98c98debe702e56b0c500b..f38855ebac5873c0f1243f33e37cfc979df3da87 100644
+--- a/batman-adv/files/etc/config/batman-adv
++++ b/batman-adv/files/etc/config/batman-adv
+@@ -9,6 +9,7 @@ config 'mesh' 'bat0'
+ 	option 'gw_sel_class'
+ 	option 'log_level'
+ 	option 'orig_interval'
++	option 'vis_mode'
+ 	option 'bridge_loop_avoidance'
+ 	option 'distributed_arp_table'
+ 	option 'multicast_mode'
+diff --git a/batman-adv/files/lib/batman-adv/config.sh b/batman-adv/files/lib/batman-adv/config.sh
+index 3a746a3c0e280b9a01ae67ea27bde65619b77ebc..1429a43a9053f3f6c96a5747144b1c31265b3917 100644
+--- a/batman-adv/files/lib/batman-adv/config.sh
++++ b/batman-adv/files/lib/batman-adv/config.sh
+@@ -13,7 +13,7 @@ bat_config()
+ 	local mesh="$1"
+ 	local aggregated_ogms ap_isolation bonding bridge_loop_avoidance distributed_arp_table fragmentation
+ 	local gw_bandwidth gw_mode gw_sel_class isolation_mark hop_penalty multicast_mode network_coding log_level
+-	local orig_interval
++	local orig_interval vis_mode
+ 
+ 	config_get aggregated_ogms "$mesh" aggregated_ogms
+ 	config_get ap_isolation "$mesh" ap_isolation
+@@ -30,10 +30,11 @@ bat_config()
+ 	config_get network_coding "$mesh" network_coding
+ 	config_get log_level "$mesh" log_level
+ 	config_get orig_interval "$mesh" orig_interval
++	config_get vis_mode "$mesh" vis_mode
+ 
+ 	[ ! -f "/sys/class/net/$mesh/mesh/orig_interval" ] && echo "batman-adv mesh $mesh does not exist - check your interface configuration" && return 1
+ 
+-	[ -n "$aggregated_ogms" ] && echo $aggregated_ogms > /sys/class/net/$mesh/mesh/aggregated_ogms
++	[ -n "$aggregate_ogms" ] && echo $aggregate_ogms > /sys/class/net/$mesh/mesh/aggregate_ogms
+ 	[ -n "$ap_isolation" ] && echo $ap_isolation > /sys/class/net/$mesh/mesh/ap_isolation
+ 	[ -n "$bonding" ] && echo $bonding > /sys/class/net/$mesh/mesh/bonding
+ 	[ -n "$bridge_loop_avoidance" ] && echo $bridge_loop_avoidance > /sys/class/net/$mesh/mesh/bridge_loop_avoidance 2>&-
+@@ -48,4 +49,5 @@ bat_config()
+ 	[ -n "$network_coding" ] && echo $network_coding > /sys/class/net/$mesh/mesh/network_coding 2>&-
+ 	[ -n "$log_level" ] && echo $log_level > /sys/class/net/$mesh/mesh/log_level 2>&-
+ 	[ -n "$orig_interval" ] && echo $orig_interval > /sys/class/net/$mesh/mesh/orig_interval
++	[ -n "$vis_mode" ] && echo $vis_mode > /sys/class/net/$mesh/mesh/vis_mode
+ }
+diff --git a/batman-adv/files/lib/netifd/proto/batadv.sh b/batman-adv/files/lib/netifd/proto/batadv.sh
+index 1e0c9d0fe24d44c7f7cc9bddaf8065c60f680862..d0ab238d2652c05a08c5f4bede428a36cdedf345 100644
+--- a/batman-adv/files/lib/netifd/proto/batadv.sh
++++ b/batman-adv/files/lib/netifd/proto/batadv.sh
+@@ -7,19 +7,22 @@ init_proto "$@"
+ proto_batadv_init_config() {
+ 	proto_config_add_string "mesh"
+ 	proto_config_add_string "routing_algo"
++	proto_config_add_string "mesh_no_rebroadcast"
+ }
+ 
+ proto_batadv_setup() {
+ 	local config="$1"
+ 	local iface="$2"
+ 
+-	local mesh routing_algo
+-	json_get_vars mesh routing_algo
++	local mesh routing_algo mesh_no_rebroadcast
++	json_get_vars mesh routing_algo mesh_no_rebroadcast
+ 
+ 	[ -n "$routing_algo" ] || routing_algo="BATMAN_IV"
+ 	echo "$routing_algo" > "/sys/module/batman_adv/parameters/routing_algo"
+ 
+ 	echo "$mesh" > "/sys/class/net/$iface/batman_adv/mesh_iface"
++	[ -n "$mesh_no_rebroadcast" ] && echo "$mesh_no_rebroadcast" > "/sys/class/net/$iface/batman_adv/no_rebroadcast"
++
+ 	proto_init_update "$iface" 1
+ 	proto_send_update "$config"
+ }
+diff --git a/batman-adv/patches/0001-batman-adv-Avoid-nullptr-dereference-in-bla-after-vl.patch b/batman-adv/patches/0001-batman-adv-Avoid-nullptr-dereference-in-bla-after-vl.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..49c06376b039e8df6caffc79fd83eaae2ca16946
+--- /dev/null
++++ b/batman-adv/patches/0001-batman-adv-Avoid-nullptr-dereference-in-bla-after-vl.patch
+@@ -0,0 +1,35 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Sat, 2 Jul 2016 09:52:13 +0200
++Subject: [PATCH] batman-adv: Avoid nullptr dereference in bla after vlan_insert_tag
++
++vlan_insert_tag can return NULL on errors. The bridge loop avoidance code
++therefore has to check the return value of vlan_insert_tag for NULL before
++it can safely operate on this pointer.
++
++Fixes: a9ce0dc43e2c ("batman-adv: add basic bridge loop avoidance code")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++Signed-off-by: Marek Lindner <mareklindner@neomailbox.ch>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/e4cffba4d3353ea15287abbfbdd65208aa62c156
++---
++ net/batman-adv/bridge_loop_avoidance.c | 5 ++++-
++ 1 file changed, 4 insertions(+), 1 deletion(-)
++
++diff --git a/net/batman-adv/bridge_loop_avoidance.c b/net/batman-adv/bridge_loop_avoidance.c
++index 748a9ea..7129780 100644
++--- a/net/batman-adv/bridge_loop_avoidance.c
+++++ b/net/batman-adv/bridge_loop_avoidance.c
++@@ -418,9 +418,12 @@ static void batadv_bla_send_claim(struct batadv_priv *bat_priv, u8 *mac,
++ 		break;
++ 	}
++ 
++-	if (vid & BATADV_VLAN_HAS_TAG)
+++	if (vid & BATADV_VLAN_HAS_TAG) {
++ 		skb = vlan_insert_tag(skb, htons(ETH_P_8021Q),
++ 				      vid & VLAN_VID_MASK);
+++		if (!skb)
+++			goto out;
+++	}
++ 
++ 	skb_reset_mac_header(skb);
++ 	skb->protocol = eth_type_trans(skb, soft_iface);
+diff --git a/batman-adv/patches/0001-batman-adv-fix-TT-sync-flag-inconsistencies.patch b/batman-adv/patches/0001-batman-adv-fix-TT-sync-flag-inconsistencies.patch
+deleted file mode 100644
+index c96f9fd85a57db48065bcc857e31cf493d06254d..0000000000000000000000000000000000000000
+--- a/batman-adv/patches/0001-batman-adv-fix-TT-sync-flag-inconsistencies.patch
++++ /dev/null
+@@ -1,208 +0,0 @@
+-From: Linus Lüssing <linus.luessing@c0d3.blue>
+-Date: Thu, 6 Jul 2017 07:02:25 +0200
+-Subject: [PATCH] batman-adv: fix TT sync flag inconsistencies
+-
+-This patch fixes an issue in the translation table code potentially
+-leading to a TT Request + Response storm. The issue may occur for nodes
+-involving BLA and an inconsistent configuration of the batman-adv AP
+-isolation feature. However, since the new multicast optimizations, a
+-single, malformed packet may lead to a mesh-wide, persistent
+-Denial-of-Service, too.
+-
+-The issue occurs because nodes are currently OR-ing the TT sync flags of
+-all originators announcing a specific MAC address via the
+-translation table. When an intermediate node now receives a TT Request
+-and wants to answer this on behave of the destination node then this
+-intermediate node now responds with an altered flag field and broken
+-CRC. The next OGM of the real destination will lead to a CRC mismatch
+-and triggering a TT Request and Response again.
+-
+-Furthermore, the OR-ing is currently never undone as long as at least
+-one originator announcing the according MAC address remains, leading to
+-the potential persistency of this issue.
+-
+-This patch fixes this issue by storing the flags used in the CRC
+-calculation on a a per TT orig entry basis to be able to respond with
+-the correct, original flags in an intermediate TT Response for one
+-thing. And to be able to correctly unset sync flags once all nodes
+-announcing a sync flag vanish for another.
+-
+-Fixes: fa614fd04692 ("batman-adv: fix tt_global_entries flags update")
+-Signed-off-by: Linus Lüssing <linus.luessing@c0d3.blue>
+-Acked-by: Antonio Quartulli <a@unstable.cc>
+-Signed-off-by: Sven Eckelmann <sven@narfation.org>
+-
+-Origin: other, https://patchwork.open-mesh.org/patch/17072/
+----
+- net/batman-adv/translation-table.c | 60 ++++++++++++++++++++++++++++++++------
+- net/batman-adv/types.h             |  2 ++
+- 2 files changed, 53 insertions(+), 9 deletions(-)
+-
+-diff --git a/net/batman-adv/translation-table.c b/net/batman-adv/translation-table.c
+-index e1133bc634b5e8ed9a4639677e577a0d52e7c1d5..8a3ce79b1307b7f260ce2f64e96bdacfb9a322f0 100644
+---- a/net/batman-adv/translation-table.c
+-+++ b/net/batman-adv/translation-table.c
+-@@ -1549,9 +1549,41 @@ batadv_tt_global_entry_has_orig(const struct batadv_tt_global_entry *entry,
+- 	return found;
+- }
+- 
+-+/**
+-+ * batadv_tt_global_sync_flags - update TT sync flags
+-+ * @tt_global: the TT global entry to update sync flags in
+-+ *
+-+ * Updates the sync flag bits in the tt_global flag attribute with a logical
+-+ * OR of all sync flags from any of its TT orig entries.
+-+ */
+-+static void
+-+batadv_tt_global_sync_flags(struct batadv_tt_global_entry *tt_global)
+-+{
+-+	struct batadv_tt_orig_list_entry *orig_entry;
+-+	const struct hlist_head *head;
+-+	u16 flags = BATADV_NO_FLAGS;
+-+
+-+	rcu_read_lock();
+-+	head = &tt_global->orig_list;
+-+	hlist_for_each_entry_rcu(orig_entry, head, list)
+-+		flags |= orig_entry->flags;
+-+	rcu_read_unlock();
+-+
+-+	flags |= tt_global->common.flags & (~BATADV_TT_SYNC_MASK);
+-+	tt_global->common.flags = flags;
+-+}
+-+
+-+/**
+-+ * batadv_tt_global_orig_entry_add - add or update a TT orig entry
+-+ * @tt_global: the TT global entry to add an orig entry in
+-+ * @orig_node: the originator to add an orig entry for
+-+ * @ttvn: translation table version number of this changeset
+-+ * @flags: TT sync flags
+-+ */
+- static void
+- batadv_tt_global_orig_entry_add(struct batadv_tt_global_entry *tt_global,
+--				struct batadv_orig_node *orig_node, int ttvn)
+-+				struct batadv_orig_node *orig_node, int ttvn,
+-+				u8 flags)
+- {
+- 	struct batadv_tt_orig_list_entry *orig_entry;
+- 
+-@@ -1561,7 +1593,8 @@ batadv_tt_global_orig_entry_add(struct batadv_tt_global_entry *tt_global,
+- 		 * was added during a "temporary client detection"
+- 		 */
+- 		orig_entry->ttvn = ttvn;
+--		goto out;
+-+		orig_entry->flags = flags;
+-+		goto sync_flags;
+- 	}
+- 
+- 	orig_entry = kmem_cache_zalloc(batadv_tt_orig_cache, GFP_ATOMIC);
+-@@ -1573,6 +1606,7 @@ batadv_tt_global_orig_entry_add(struct batadv_tt_global_entry *tt_global,
+- 	batadv_tt_global_size_inc(orig_node, tt_global->common.vid);
+- 	orig_entry->orig_node = orig_node;
+- 	orig_entry->ttvn = ttvn;
+-+	orig_entry->flags = flags;
+- 	kref_init(&orig_entry->refcount);
+- 
+- 	spin_lock_bh(&tt_global->list_lock);
+-@@ -1582,6 +1616,8 @@ batadv_tt_global_orig_entry_add(struct batadv_tt_global_entry *tt_global,
+- 	spin_unlock_bh(&tt_global->list_lock);
+- 	atomic_inc(&tt_global->orig_list_count);
+- 
+-+sync_flags:
+-+	batadv_tt_global_sync_flags(tt_global);
+- out:
+- 	if (orig_entry)
+- 		batadv_tt_orig_list_entry_put(orig_entry);
+-@@ -1703,10 +1739,10 @@ static bool batadv_tt_global_add(struct batadv_priv *bat_priv,
+- 		}
+- 
+- 		/* the change can carry possible "attribute" flags like the
+--		 * TT_CLIENT_WIFI, therefore they have to be copied in the
+-+		 * TT_CLIENT_TEMP, therefore they have to be copied in the
+- 		 * client entry
+- 		 */
+--		common->flags |= flags;
+-+		common->flags |= flags & (~BATADV_TT_SYNC_MASK);
+- 
+- 		/* If there is the BATADV_TT_CLIENT_ROAM flag set, there is only
+- 		 * one originator left in the list and we previously received a
+-@@ -1723,7 +1759,8 @@ static bool batadv_tt_global_add(struct batadv_priv *bat_priv,
+- 	}
+- add_orig_entry:
+- 	/* add the new orig_entry (if needed) or update it */
+--	batadv_tt_global_orig_entry_add(tt_global_entry, orig_node, ttvn);
+-+	batadv_tt_global_orig_entry_add(tt_global_entry, orig_node, ttvn,
+-+					flags & BATADV_TT_SYNC_MASK);
+- 
+- 	batadv_dbg(BATADV_DBG_TT, bat_priv,
+- 		   "Creating new global tt entry: %pM (vid: %d, via %pM)\n",
+-@@ -1946,6 +1983,7 @@ batadv_tt_global_dump_subentry(struct sk_buff *msg, u32 portid, u32 seq,
+- 			       struct batadv_tt_orig_list_entry *orig,
+- 			       bool best)
+- {
+-+	u16 flags = (common->flags & (~BATADV_TT_SYNC_MASK)) | orig->flags;
+- 	void *hdr;
+- 	struct batadv_orig_node_vlan *vlan;
+- 	u8 last_ttvn;
+-@@ -1975,7 +2013,7 @@ batadv_tt_global_dump_subentry(struct sk_buff *msg, u32 portid, u32 seq,
+- 	    nla_put_u8(msg, BATADV_ATTR_TT_LAST_TTVN, last_ttvn) ||
+- 	    nla_put_u32(msg, BATADV_ATTR_TT_CRC32, crc) ||
+- 	    nla_put_u16(msg, BATADV_ATTR_TT_VID, common->vid) ||
+--	    nla_put_u32(msg, BATADV_ATTR_TT_FLAGS, common->flags))
+-+	    nla_put_u32(msg, BATADV_ATTR_TT_FLAGS, flags))
+- 		goto nla_put_failure;
+- 
+- 	if (best && nla_put_flag(msg, BATADV_ATTR_FLAG_BEST))
+-@@ -2589,6 +2627,7 @@ static u32 batadv_tt_global_crc(struct batadv_priv *bat_priv,
+- 				unsigned short vid)
+- {
+- 	struct batadv_hashtable *hash = bat_priv->tt.global_hash;
+-+	struct batadv_tt_orig_list_entry *tt_orig;
+- 	struct batadv_tt_common_entry *tt_common;
+- 	struct batadv_tt_global_entry *tt_global;
+- 	struct hlist_head *head;
+-@@ -2627,8 +2666,9 @@ static u32 batadv_tt_global_crc(struct batadv_priv *bat_priv,
+- 			/* find out if this global entry is announced by this
+- 			 * originator
+- 			 */
+--			if (!batadv_tt_global_entry_has_orig(tt_global,
+--							     orig_node))
+-+			tt_orig = batadv_tt_global_orig_entry_find(tt_global,
+-+								   orig_node);
+-+			if (!tt_orig)
+- 				continue;
+- 
+- 			/* use network order to read the VID: this ensures that
+-@@ -2640,10 +2680,12 @@ static u32 batadv_tt_global_crc(struct batadv_priv *bat_priv,
+- 			/* compute the CRC on flags that have to be kept in sync
+- 			 * among nodes
+- 			 */
+--			flags = tt_common->flags & BATADV_TT_SYNC_MASK;
+-+			flags = tt_orig->flags;
+- 			crc_tmp = crc32c(crc_tmp, &flags, sizeof(flags));
+- 
+- 			crc ^= crc32c(crc_tmp, tt_common->addr, ETH_ALEN);
+-+
+-+			batadv_tt_orig_list_entry_put(tt_orig);
+- 		}
+- 		rcu_read_unlock();
+- 	}
+-diff --git a/net/batman-adv/types.h b/net/batman-adv/types.h
+-index ea43a64492479809fe6bdf95b436792078f50e9f..a62795868794103d7e712ba91def5997dc3a5779 100644
+---- a/net/batman-adv/types.h
+-+++ b/net/batman-adv/types.h
+-@@ -1260,6 +1260,7 @@ struct batadv_tt_global_entry {
+-  * struct batadv_tt_orig_list_entry - orig node announcing a non-mesh client
+-  * @orig_node: pointer to orig node announcing this non-mesh client
+-  * @ttvn: translation table version number which added the non-mesh client
+-+ * @flags: per orig entry TT sync flags
+-  * @list: list node for batadv_tt_global_entry::orig_list
+-  * @refcount: number of contexts the object is used
+-  * @rcu: struct used for freeing in an RCU-safe manner
+-@@ -1267,6 +1268,7 @@ struct batadv_tt_global_entry {
+- struct batadv_tt_orig_list_entry {
+- 	struct batadv_orig_node *orig_node;
+- 	u8 ttvn;
+-+	u8 flags;
+- 	struct hlist_node list;
+- 	struct kref refcount;
+- 	struct rcu_head rcu;
+diff --git a/batman-adv/patches/0002-batman-adv-Avoid-nullptr-dereference-in-dat-after-vl.patch b/batman-adv/patches/0002-batman-adv-Avoid-nullptr-dereference-in-dat-after-vl.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e5e72d7d6052efa5c6fa5d1a7998255b4f879ae2
+--- /dev/null
++++ b/batman-adv/patches/0002-batman-adv-Avoid-nullptr-dereference-in-dat-after-vl.patch
+@@ -0,0 +1,49 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Sat, 2 Jul 2016 09:52:14 +0200
++Subject: [PATCH] batman-adv: Avoid nullptr dereference in dat after vlan_insert_tag
++
++vlan_insert_tag can return NULL on errors. The distributed arp table code
++therefore has to check the return value of vlan_insert_tag for NULL before
++it can safely operate on this pointer.
++
++Fixes: 53c6c262a581 ("batman-adv: tag locally generated ARP reply if needed")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++Signed-off-by: Marek Lindner <mareklindner@neomailbox.ch>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/898382d11fa1f737cd4f7033db1088c601fd11ed
++---
++ net/batman-adv/distributed-arp-table.c | 10 ++++++++--
++ 1 file changed, 8 insertions(+), 2 deletions(-)
++
++diff --git a/net/batman-adv/distributed-arp-table.c b/net/batman-adv/distributed-arp-table.c
++index 278800a..aee3b39 100644
++--- a/net/batman-adv/distributed-arp-table.c
+++++ b/net/batman-adv/distributed-arp-table.c
++@@ -1009,9 +1009,12 @@ bool batadv_dat_snoop_outgoing_arp_request(struct batadv_priv *bat_priv,
++ 		if (!skb_new)
++ 			goto out;
++ 
++-		if (vid & BATADV_VLAN_HAS_TAG)
+++		if (vid & BATADV_VLAN_HAS_TAG) {
++ 			skb_new = vlan_insert_tag(skb_new, htons(ETH_P_8021Q),
++ 						  vid & VLAN_VID_MASK);
+++			if (!skb_new)
+++				goto out;
+++		}
++ 
++ 		skb_reset_mac_header(skb_new);
++ 		skb_new->protocol = eth_type_trans(skb_new,
++@@ -1089,9 +1092,12 @@ bool batadv_dat_snoop_incoming_arp_request(struct batadv_priv *bat_priv,
++ 	 */
++ 	skb_reset_mac_header(skb_new);
++ 
++-	if (vid & BATADV_VLAN_HAS_TAG)
+++	if (vid & BATADV_VLAN_HAS_TAG) {
++ 		skb_new = vlan_insert_tag(skb_new, htons(ETH_P_8021Q),
++ 					  vid & VLAN_VID_MASK);
+++		if (!skb_new)
+++			goto out;
+++	}
++ 
++ 	/* To preserve backwards compatibility, the node has choose the outgoing
++ 	 * format based on the incoming request packet type. The assumption is
+diff --git a/batman-adv/patches/0003-batman-adv-Avoid-tt_req_node-list-put-for-unhashed-e.patch b/batman-adv/patches/0003-batman-adv-Avoid-tt_req_node-list-put-for-unhashed-e.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..60d4e12f59a9ed788b1f51ce17957efb72315186
+--- /dev/null
++++ b/batman-adv/patches/0003-batman-adv-Avoid-tt_req_node-list-put-for-unhashed-e.patch
+@@ -0,0 +1,41 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Fri, 24 Jun 2016 21:43:32 +0200
++Subject: [PATCH] batman-adv: Avoid tt_req_node list put for unhashed entry
++
++It can happen that a tt_req_node list entry was already removed from
++tt.req_list when batadv_send_tt_request reaches the end of the function.
++The reference counter was already reduced by 1 for the list entry and thus
++the reference counter is not allowed to be reduced again. Otherwise, the
++entry is freed too early and the next batadv_tt_req_node_put in this
++function will operate on freed memory.
++
++Fixes: cea194d90b11 ("batman-adv: improved client announcement mechanism")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++Signed-off-by: Marek Lindner <mareklindner@neomailbox.ch>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/03ecc9f957b837c755f09251c5f684996521e487
++---
++ net/batman-adv/translation-table.c | 8 +++++---
++ 1 file changed, 5 insertions(+), 3 deletions(-)
++
++diff --git a/net/batman-adv/translation-table.c b/net/batman-adv/translation-table.c
++index d033a05..57ec87f 100644
++--- a/net/batman-adv/translation-table.c
+++++ b/net/batman-adv/translation-table.c
++@@ -2639,11 +2639,13 @@ static bool batadv_send_tt_request(struct batadv_priv *bat_priv,
++ out:
++ 	if (primary_if)
++ 		batadv_hardif_put(primary_if);
+++
++ 	if (ret && tt_req_node) {
++ 		spin_lock_bh(&bat_priv->tt.req_list_lock);
++-		/* hlist_del_init() verifies tt_req_node still is in the list */
++-		hlist_del_init(&tt_req_node->list);
++-		batadv_tt_req_node_put(tt_req_node);
+++		if (!hlist_unhashed(&tt_req_node->list)) {
+++			hlist_del_init(&tt_req_node->list);
+++			batadv_tt_req_node_put(tt_req_node);
+++		}
++ 		spin_unlock_bh(&bat_priv->tt.req_list_lock);
++ 	}
++ 
+diff --git a/batman-adv/patches/0004-batman-adv-Fix-orig_node_vlan-leak-on-orig_node_rele.patch b/batman-adv/patches/0004-batman-adv-Fix-orig_node_vlan-leak-on-orig_node_rele.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7af316221963f1284dbc792de30868b146c9cbe3
+--- /dev/null
++++ b/batman-adv/patches/0004-batman-adv-Fix-orig_node_vlan-leak-on-orig_node_rele.patch
+@@ -0,0 +1,43 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Thu, 30 Jun 2016 20:10:46 +0200
++Subject: [PATCH] batman-adv: Fix orig_node_vlan leak on orig_node_release
++
++batadv_orig_node_new uses batadv_orig_node_vlan_new to allocate a new
++batadv_orig_node_vlan and add it to batadv_orig_node::vlan_list. References
++to this list have also to be cleaned when the batadv_orig_node is removed.
++
++Fixes: 21a57f6e7a3b ("batman-adv: make the TT CRC logic VLAN specific")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++Signed-off-by: Marek Lindner <mareklindner@neomailbox.ch>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/719afd254e812c7ff8688ce79bebb7324ec438d6
++---
++ net/batman-adv/originator.c | 8 ++++++++
++ 1 file changed, 8 insertions(+)
++
++diff --git a/net/batman-adv/originator.c b/net/batman-adv/originator.c
++index 7f51bc2..fe2fcda 100644
++--- a/net/batman-adv/originator.c
+++++ b/net/batman-adv/originator.c
++@@ -765,6 +765,7 @@ static void batadv_orig_node_release(struct kref *ref)
++ 	struct batadv_neigh_node *neigh_node;
++ 	struct batadv_orig_node *orig_node;
++ 	struct batadv_orig_ifinfo *orig_ifinfo;
+++	struct batadv_orig_node_vlan *vlan;
++ 
++ 	orig_node = container_of(ref, struct batadv_orig_node, refcount);
++ 
++@@ -784,6 +785,13 @@ static void batadv_orig_node_release(struct kref *ref)
++ 	}
++ 	spin_unlock_bh(&orig_node->neigh_list_lock);
++ 
+++	spin_lock_bh(&orig_node->vlan_list_lock);
+++	hlist_for_each_entry_safe(vlan, node_tmp, &orig_node->vlan_list, list) {
+++		hlist_del_rcu(&vlan->list);
+++		batadv_orig_node_vlan_put(vlan);
+++	}
+++	spin_unlock_bh(&orig_node->vlan_list_lock);
+++
++ 	/* Free nc_nodes */
++ 	batadv_nc_purge_orig(orig_node->bat_priv, orig_node, NULL);
++ 
+diff --git a/batman-adv/patches/0005-batman-adv-Fix-non-atomic-bla_claim-backbone_gw-acce.patch b/batman-adv/patches/0005-batman-adv-Fix-non-atomic-bla_claim-backbone_gw-acce.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e0afdd0e63bf56c36e02ec4fde15a3f193efc69
+--- /dev/null
++++ b/batman-adv/patches/0005-batman-adv-Fix-non-atomic-bla_claim-backbone_gw-acce.patch
+@@ -0,0 +1,291 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Fri, 1 Jul 2016 15:49:43 +0200
++Subject: [PATCH] batman-adv: Fix non-atomic bla_claim::backbone_gw access
++
++The pointer batadv_bla_claim::backbone_gw can be changed at any time.
++Therefore, access to it must be protected to ensure that two function
++accessing the same backbone_gw are actually accessing the same. This is
++especially important when the crc_lock is used or when the backbone_gw of a
++claim is exchanged.
++
++Not doing so leads to invalid memory access and/or reference leaks.
++
++Fixes: a9ce0dc43e2c ("batman-adv: add basic bridge loop avoidance code")
++Fixes: b307e72d119f ("batman-adv: lock crc access in bridge loop avoidance")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++Acked-by: Simon Wunderlich <sw@simonwunderlich.de>
++Signed-off-by: Marek Lindner <mareklindner@neomailbox.ch>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/e401297e3a393896e9b07bef8d6e2df203b60d43
++---
++ net/batman-adv/bridge_loop_avoidance.c | 111 ++++++++++++++++++++++++++-------
++ net/batman-adv/types.h                 |   2 +
++ 2 files changed, 90 insertions(+), 23 deletions(-)
++
++diff --git a/net/batman-adv/bridge_loop_avoidance.c b/net/batman-adv/bridge_loop_avoidance.c
++index 7129780..825a5cd 100644
++--- a/net/batman-adv/bridge_loop_avoidance.c
+++++ b/net/batman-adv/bridge_loop_avoidance.c
++@@ -177,10 +177,21 @@ static void batadv_backbone_gw_put(struct batadv_bla_backbone_gw *backbone_gw)
++ static void batadv_claim_release(struct kref *ref)
++ {
++ 	struct batadv_bla_claim *claim;
+++	struct batadv_bla_backbone_gw *old_backbone_gw;
++ 
++ 	claim = container_of(ref, struct batadv_bla_claim, refcount);
++ 
++-	batadv_backbone_gw_put(claim->backbone_gw);
+++	spin_lock_bh(&claim->backbone_lock);
+++	old_backbone_gw = claim->backbone_gw;
+++	claim->backbone_gw = NULL;
+++	spin_unlock_bh(&claim->backbone_lock);
+++
+++	spin_lock_bh(&old_backbone_gw->crc_lock);
+++	old_backbone_gw->crc ^= crc16(0, claim->addr, ETH_ALEN);
+++	spin_unlock_bh(&old_backbone_gw->crc_lock);
+++
+++	batadv_backbone_gw_put(old_backbone_gw);
+++
++ 	kfree_rcu(claim, rcu);
++ }
++ 
++@@ -677,8 +688,10 @@ static void batadv_bla_add_claim(struct batadv_priv *bat_priv,
++ 				 const u8 *mac, const unsigned short vid,
++ 				 struct batadv_bla_backbone_gw *backbone_gw)
++ {
+++	struct batadv_bla_backbone_gw *old_backbone_gw;
++ 	struct batadv_bla_claim *claim;
++ 	struct batadv_bla_claim search_claim;
+++	bool remove_crc = false;
++ 	int hash_added;
++ 
++ 	ether_addr_copy(search_claim.addr, mac);
++@@ -692,8 +705,10 @@ static void batadv_bla_add_claim(struct batadv_priv *bat_priv,
++ 			return;
++ 
++ 		ether_addr_copy(claim->addr, mac);
+++		spin_lock_init(&claim->backbone_lock);
++ 		claim->vid = vid;
++ 		claim->lasttime = jiffies;
+++		kref_get(&backbone_gw->refcount);
++ 		claim->backbone_gw = backbone_gw;
++ 
++ 		kref_init(&claim->refcount);
++@@ -721,15 +736,26 @@ static void batadv_bla_add_claim(struct batadv_priv *bat_priv,
++ 			   "bla_add_claim(): changing ownership for %pM, vid %d\n",
++ 			   mac, BATADV_PRINT_VID(vid));
++ 
++-		spin_lock_bh(&claim->backbone_gw->crc_lock);
++-		claim->backbone_gw->crc ^= crc16(0, claim->addr, ETH_ALEN);
++-		spin_unlock_bh(&claim->backbone_gw->crc_lock);
++-		batadv_backbone_gw_put(claim->backbone_gw);
+++		remove_crc = true;
++ 	}
++-	/* set (new) backbone gw */
+++
+++	/* replace backbone_gw atomically and adjust reference counters */
+++	spin_lock_bh(&claim->backbone_lock);
+++	old_backbone_gw = claim->backbone_gw;
++ 	kref_get(&backbone_gw->refcount);
++ 	claim->backbone_gw = backbone_gw;
+++	spin_unlock_bh(&claim->backbone_lock);
++ 
+++	if (remove_crc) {
+++		/* remove claim address from old backbone_gw */
+++		spin_lock_bh(&old_backbone_gw->crc_lock);
+++		old_backbone_gw->crc ^= crc16(0, claim->addr, ETH_ALEN);
+++		spin_unlock_bh(&old_backbone_gw->crc_lock);
+++	}
+++
+++	batadv_backbone_gw_put(old_backbone_gw);
+++
+++	/* add claim address to new backbone_gw */
++ 	spin_lock_bh(&backbone_gw->crc_lock);
++ 	backbone_gw->crc ^= crc16(0, claim->addr, ETH_ALEN);
++ 	spin_unlock_bh(&backbone_gw->crc_lock);
++@@ -740,6 +766,26 @@ claim_free_ref:
++ }
++ 
++ /**
+++ * batadv_bla_claim_get_backbone_gw - Get valid reference for backbone_gw of
+++ *  claim
+++ * @claim: claim whose backbone_gw should be returned
+++ *
+++ * Return: valid reference to claim::backbone_gw
+++ */
+++static struct batadv_bla_backbone_gw *
+++batadv_bla_claim_get_backbone_gw(struct batadv_bla_claim *claim)
+++{
+++	struct batadv_bla_backbone_gw *backbone_gw;
+++
+++	spin_lock_bh(&claim->backbone_lock);
+++	backbone_gw = claim->backbone_gw;
+++	kref_get(&backbone_gw->refcount);
+++	spin_unlock_bh(&claim->backbone_lock);
+++
+++	return backbone_gw;
+++}
+++
+++/**
++  * batadv_bla_del_claim - delete a claim from the claim hash
++  * @bat_priv: the bat priv with all the soft interface information
++  * @mac: mac address of the claim to be removed
++@@ -763,10 +809,6 @@ static void batadv_bla_del_claim(struct batadv_priv *bat_priv,
++ 			   batadv_choose_claim, claim);
++ 	batadv_claim_put(claim); /* reference from the hash is gone */
++ 
++-	spin_lock_bh(&claim->backbone_gw->crc_lock);
++-	claim->backbone_gw->crc ^= crc16(0, claim->addr, ETH_ALEN);
++-	spin_unlock_bh(&claim->backbone_gw->crc_lock);
++-
++ 	/* don't need the reference from hash_find() anymore */
++ 	batadv_claim_put(claim);
++ }
++@@ -1219,6 +1261,7 @@ static void batadv_bla_purge_claims(struct batadv_priv *bat_priv,
++ 				    struct batadv_hard_iface *primary_if,
++ 				    int now)
++ {
+++	struct batadv_bla_backbone_gw *backbone_gw;
++ 	struct batadv_bla_claim *claim;
++ 	struct hlist_head *head;
++ 	struct batadv_hashtable *hash;
++@@ -1233,14 +1276,17 @@ static void batadv_bla_purge_claims(struct batadv_priv *bat_priv,
++ 
++ 		rcu_read_lock();
++ 		hlist_for_each_entry_rcu(claim, head, hash_entry) {
+++			backbone_gw = batadv_bla_claim_get_backbone_gw(claim);
++ 			if (now)
++ 				goto purge_now;
++-			if (!batadv_compare_eth(claim->backbone_gw->orig,
+++
+++			if (!batadv_compare_eth(backbone_gw->orig,
++ 						primary_if->net_dev->dev_addr))
++-				continue;
+++				goto skip;
+++
++ 			if (!batadv_has_timed_out(claim->lasttime,
++ 						  BATADV_BLA_CLAIM_TIMEOUT))
++-				continue;
+++				goto skip;
++ 
++ 			batadv_dbg(BATADV_DBG_BLA, bat_priv,
++ 				   "bla_purge_claims(): %pM, vid %d, time out\n",
++@@ -1248,8 +1294,10 @@ static void batadv_bla_purge_claims(struct batadv_priv *bat_priv,
++ 
++ purge_now:
++ 			batadv_handle_unclaim(bat_priv, primary_if,
++-					      claim->backbone_gw->orig,
+++					      backbone_gw->orig,
++ 					      claim->addr, claim->vid);
+++skip:
+++			batadv_backbone_gw_put(backbone_gw);
++ 		}
++ 		rcu_read_unlock();
++ 	}
++@@ -1760,9 +1808,11 @@ batadv_bla_loopdetect_check(struct batadv_priv *bat_priv, struct sk_buff *skb,
++ bool batadv_bla_rx(struct batadv_priv *bat_priv, struct sk_buff *skb,
++ 		   unsigned short vid, bool is_bcast)
++ {
+++	struct batadv_bla_backbone_gw *backbone_gw;
++ 	struct ethhdr *ethhdr;
++ 	struct batadv_bla_claim search_claim, *claim = NULL;
++ 	struct batadv_hard_iface *primary_if;
+++	bool own_claim;
++ 	bool ret;
++ 
++ 	ethhdr = eth_hdr(skb);
++@@ -1797,8 +1847,12 @@ bool batadv_bla_rx(struct batadv_priv *bat_priv, struct sk_buff *skb,
++ 	}
++ 
++ 	/* if it is our own claim ... */
++-	if (batadv_compare_eth(claim->backbone_gw->orig,
++-			       primary_if->net_dev->dev_addr)) {
+++	backbone_gw = batadv_bla_claim_get_backbone_gw(claim);
+++	own_claim = batadv_compare_eth(backbone_gw->orig,
+++				       primary_if->net_dev->dev_addr);
+++	batadv_backbone_gw_put(backbone_gw);
+++
+++	if (own_claim) {
++ 		/* ... allow it in any case */
++ 		claim->lasttime = jiffies;
++ 		goto allow;
++@@ -1862,7 +1916,9 @@ bool batadv_bla_tx(struct batadv_priv *bat_priv, struct sk_buff *skb,
++ {
++ 	struct ethhdr *ethhdr;
++ 	struct batadv_bla_claim search_claim, *claim = NULL;
+++	struct batadv_bla_backbone_gw *backbone_gw;
++ 	struct batadv_hard_iface *primary_if;
+++	bool client_roamed;
++ 	bool ret = false;
++ 
++ 	primary_if = batadv_primary_if_get_selected(bat_priv);
++@@ -1892,8 +1948,12 @@ bool batadv_bla_tx(struct batadv_priv *bat_priv, struct sk_buff *skb,
++ 		goto allow;
++ 
++ 	/* check if we are responsible. */
++-	if (batadv_compare_eth(claim->backbone_gw->orig,
++-			       primary_if->net_dev->dev_addr)) {
+++	backbone_gw = batadv_bla_claim_get_backbone_gw(claim);
+++	client_roamed = batadv_compare_eth(backbone_gw->orig,
+++					   primary_if->net_dev->dev_addr);
+++	batadv_backbone_gw_put(backbone_gw);
+++
+++	if (client_roamed) {
++ 		/* if yes, the client has roamed and we have
++ 		 * to unclaim it.
++ 		 */
++@@ -1941,6 +2001,7 @@ int batadv_bla_claim_table_seq_print_text(struct seq_file *seq, void *offset)
++ 	struct net_device *net_dev = (struct net_device *)seq->private;
++ 	struct batadv_priv *bat_priv = netdev_priv(net_dev);
++ 	struct batadv_hashtable *hash = bat_priv->bla.claim_hash;
+++	struct batadv_bla_backbone_gw *backbone_gw;
++ 	struct batadv_bla_claim *claim;
++ 	struct batadv_hard_iface *primary_if;
++ 	struct hlist_head *head;
++@@ -1965,17 +2026,21 @@ int batadv_bla_claim_table_seq_print_text(struct seq_file *seq, void *offset)
++ 
++ 		rcu_read_lock();
++ 		hlist_for_each_entry_rcu(claim, head, hash_entry) {
++-			is_own = batadv_compare_eth(claim->backbone_gw->orig,
+++			backbone_gw = batadv_bla_claim_get_backbone_gw(claim);
+++
+++			is_own = batadv_compare_eth(backbone_gw->orig,
++ 						    primary_addr);
++ 
++-			spin_lock_bh(&claim->backbone_gw->crc_lock);
++-			backbone_crc = claim->backbone_gw->crc;
++-			spin_unlock_bh(&claim->backbone_gw->crc_lock);
+++			spin_lock_bh(&backbone_gw->crc_lock);
+++			backbone_crc = backbone_gw->crc;
+++			spin_unlock_bh(&backbone_gw->crc_lock);
++ 			seq_printf(seq, " * %pM on %5d by %pM [%c] (%#.4x)\n",
++ 				   claim->addr, BATADV_PRINT_VID(claim->vid),
++-				   claim->backbone_gw->orig,
+++				   backbone_gw->orig,
++ 				   (is_own ? 'x' : ' '),
++ 				   backbone_crc);
+++
+++			batadv_backbone_gw_put(backbone_gw);
++ 		}
++ 		rcu_read_unlock();
++ 	}
++diff --git a/net/batman-adv/types.h b/net/batman-adv/types.h
++index ba846b0..0051222 100644
++--- a/net/batman-adv/types.h
+++++ b/net/batman-adv/types.h
++@@ -1042,6 +1042,7 @@ struct batadv_bla_backbone_gw {
++  * @addr: mac address of claimed non-mesh client
++  * @vid: vlan id this client was detected on
++  * @backbone_gw: pointer to backbone gw claiming this client
+++ * @backbone_lock: lock protecting backbone_gw pointer
++  * @lasttime: last time we heard of claim (locals only)
++  * @hash_entry: hlist node for batadv_priv_bla::claim_hash
++  * @refcount: number of contexts the object is used
++@@ -1051,6 +1052,7 @@ struct batadv_bla_claim {
++ 	u8 addr[ETH_ALEN];
++ 	unsigned short vid;
++ 	struct batadv_bla_backbone_gw *backbone_gw;
+++	spinlock_t backbone_lock; /* protects backbone_gw */
++ 	unsigned long lasttime;
++ 	struct hlist_node hash_entry;
++ 	struct rcu_head rcu;
+diff --git a/batman-adv/patches/0006-batman-adv-Fix-reference-leak-in-batadv_find_router.patch b/batman-adv/patches/0006-batman-adv-Fix-reference-leak-in-batadv_find_router.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..1eeea6ea84b5341397da335d1da9a0d4c8fef9a8
+--- /dev/null
++++ b/batman-adv/patches/0006-batman-adv-Fix-reference-leak-in-batadv_find_router.patch
+@@ -0,0 +1,120 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Thu, 30 Jun 2016 20:11:34 +0200
++Subject: [PATCH] batman-adv: Fix reference leak in batadv_find_router
++
++The replacement of last_bonding_candidate in batadv_orig_node has to be an
++atomic operation. Otherwise it is possible that the reference counter of a
++batadv_orig_ifinfo is reduced which was no longer the
++last_bonding_candidate when the new candidate is added. This can either
++lead to an invalid memory access or to reference leaks which make it
++impossible to an interface which was added to batman-adv.
++
++Fixes: 797edd9e87ac ("batman-adv: add bonding again")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++Acked-by: Simon Wunderlich <sw@simonwunderlich.de>
++Signed-off-by: Marek Lindner <mareklindner@neomailbox.ch>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/6ecc711374afd93ee0c2216b38ae52d3ce680c3f
++---
++ net/batman-adv/routing.c | 52 ++++++++++++++++++++++++++++++++++++------------
++ net/batman-adv/types.h   |  4 +++-
++ 2 files changed, 42 insertions(+), 14 deletions(-)
++
++diff --git a/net/batman-adv/routing.c b/net/batman-adv/routing.c
++index 6c2901a..bfac086 100644
++--- a/net/batman-adv/routing.c
+++++ b/net/batman-adv/routing.c
++@@ -456,6 +456,29 @@ static int batadv_check_unicast_packet(struct batadv_priv *bat_priv,
++ }
++ 
++ /**
+++ * batadv_last_bonding_replace - Replace last_bonding_candidate of orig_node
+++ * @orig_node: originator node whose bonding candidates should be replaced
+++ * @new_candidate: new bonding candidate or NULL
+++ */
+++static void
+++batadv_last_bonding_replace(struct batadv_orig_node *orig_node,
+++			    struct batadv_orig_ifinfo *new_candidate)
+++{
+++	struct batadv_orig_ifinfo *old_candidate;
+++
+++	spin_lock_bh(&orig_node->neigh_list_lock);
+++	old_candidate = orig_node->last_bonding_candidate;
+++
+++	if (new_candidate)
+++		kref_get(&new_candidate->refcount);
+++	orig_node->last_bonding_candidate = new_candidate;
+++	spin_unlock_bh(&orig_node->neigh_list_lock);
+++
+++	if (old_candidate)
+++		batadv_orig_ifinfo_put(old_candidate);
+++}
+++
+++/**
++  * batadv_find_router - find a suitable router for this originator
++  * @bat_priv: the bat priv with all the soft interface information
++  * @orig_node: the destination node
++@@ -562,10 +585,6 @@ next:
++ 	}
++ 	rcu_read_unlock();
++ 
++-	/* last_bonding_candidate is reset below, remove the old reference. */
++-	if (orig_node->last_bonding_candidate)
++-		batadv_orig_ifinfo_put(orig_node->last_bonding_candidate);
++-
++ 	/* After finding candidates, handle the three cases:
++ 	 * 1) there is a next candidate, use that
++ 	 * 2) there is no next candidate, use the first of the list
++@@ -574,21 +593,28 @@ next:
++ 	if (next_candidate) {
++ 		batadv_neigh_node_put(router);
++ 
++-		/* remove references to first candidate, we don't need it. */
++-		if (first_candidate) {
++-			batadv_neigh_node_put(first_candidate_router);
++-			batadv_orig_ifinfo_put(first_candidate);
++-		}
+++		kref_get(&next_candidate_router->refcount);
++ 		router = next_candidate_router;
++-		orig_node->last_bonding_candidate = next_candidate;
+++		batadv_last_bonding_replace(orig_node, next_candidate);
++ 	} else if (first_candidate) {
++ 		batadv_neigh_node_put(router);
++ 
++-		/* refcounting has already been done in the loop above. */
+++		kref_get(&first_candidate_router->refcount);
++ 		router = first_candidate_router;
++-		orig_node->last_bonding_candidate = first_candidate;
+++		batadv_last_bonding_replace(orig_node, first_candidate);
++ 	} else {
++-		orig_node->last_bonding_candidate = NULL;
+++		batadv_last_bonding_replace(orig_node, NULL);
+++	}
+++
+++	/* cleanup of candidates */
+++	if (first_candidate) {
+++		batadv_neigh_node_put(first_candidate_router);
+++		batadv_orig_ifinfo_put(first_candidate);
+++	}
+++
+++	if (next_candidate) {
+++		batadv_neigh_node_put(next_candidate_router);
+++		batadv_orig_ifinfo_put(next_candidate);
++ 	}
++ 
++ 	return router;
++diff --git a/net/batman-adv/types.h b/net/batman-adv/types.h
++index 0051222..74d865a 100644
++--- a/net/batman-adv/types.h
+++++ b/net/batman-adv/types.h
++@@ -330,7 +330,9 @@ struct batadv_orig_node {
++ 	DECLARE_BITMAP(bcast_bits, BATADV_TQ_LOCAL_WINDOW_SIZE);
++ 	u32 last_bcast_seqno;
++ 	struct hlist_head neigh_list;
++-	/* neigh_list_lock protects: neigh_list and router */
+++	/* neigh_list_lock protects: neigh_list, ifinfo_list,
+++	 * last_bonding_candidate and router
+++	 */
++ 	spinlock_t neigh_list_lock;
++ 	struct hlist_node hash_entry;
++ 	struct batadv_priv *bat_priv;
+diff --git a/batman-adv/patches/0007-batman-adv-Free-last_bonding_candidate-on-release-of.patch b/batman-adv/patches/0007-batman-adv-Free-last_bonding_candidate-on-release-of.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..9e548da332cdb7a890bbac919ae9158fe776e714
+--- /dev/null
++++ b/batman-adv/patches/0007-batman-adv-Free-last_bonding_candidate-on-release-of.patch
+@@ -0,0 +1,45 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Thu, 30 Jun 2016 21:41:13 +0200
++Subject: [PATCH] batman-adv: Free last_bonding_candidate on release of orig_node
++
++The orig_ifinfo reference counter for last_bonding_candidate in
++batadv_orig_node has to be reduced when an originator node is released.
++Otherwise the orig_ifinfo is leaked and the reference counter the netdevice
++is not reduced correctly.
++
++Fixes: 797edd9e87ac ("batman-adv: add bonding again")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++Signed-off-by: Marek Lindner <mareklindner@neomailbox.ch>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/20df5c53865a90095099f0af80536b8abfea303b
++---
++ net/batman-adv/originator.c | 7 +++++++
++ 1 file changed, 7 insertions(+)
++
++diff --git a/net/batman-adv/originator.c b/net/batman-adv/originator.c
++index fe2fcda..ab8c4f9 100644
++--- a/net/batman-adv/originator.c
+++++ b/net/batman-adv/originator.c
++@@ -766,6 +766,7 @@ static void batadv_orig_node_release(struct kref *ref)
++ 	struct batadv_orig_node *orig_node;
++ 	struct batadv_orig_ifinfo *orig_ifinfo;
++ 	struct batadv_orig_node_vlan *vlan;
+++	struct batadv_orig_ifinfo *last_candidate;
++ 
++ 	orig_node = container_of(ref, struct batadv_orig_node, refcount);
++ 
++@@ -783,8 +784,14 @@ static void batadv_orig_node_release(struct kref *ref)
++ 		hlist_del_rcu(&orig_ifinfo->list);
++ 		batadv_orig_ifinfo_put(orig_ifinfo);
++ 	}
+++
+++	last_candidate = orig_node->last_bonding_candidate;
+++	orig_node->last_bonding_candidate = NULL;
++ 	spin_unlock_bh(&orig_node->neigh_list_lock);
++ 
+++	if (last_candidate)
+++		batadv_orig_ifinfo_put(last_candidate);
+++
++ 	spin_lock_bh(&orig_node->vlan_list_lock);
++ 	hlist_for_each_entry_safe(vlan, node_tmp, &orig_node->vlan_list, list) {
++ 		hlist_del_rcu(&vlan->list);
+diff --git a/batman-adv/patches/0008-batman-adv-Fix-speedy-join-in-gateway-client-mode.patch b/batman-adv/patches/0008-batman-adv-Fix-speedy-join-in-gateway-client-mode.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e63b782f4f823d346995a3568f3ec27ed736f25d
+--- /dev/null
++++ b/batman-adv/patches/0008-batman-adv-Fix-speedy-join-in-gateway-client-mode.patch
+@@ -0,0 +1,35 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Sun, 12 Jun 2016 10:43:19 +0200
++Subject: [PATCH] batman-adv: Fix speedy join in gateway client mode
++
++Speedy join only works when the received packet is either broadcast or an
++4addr unicast packet. Thus packets converted from broadcast to unicast via
++the gateway handling code have to be converted to 4addr packets to allow
++the receiving gateway server to add the sender address as temporary entry
++to the translation table.
++
++Not doing it will make the batman-adv gateway server drop the DHCP response
++in many situations because it doesn't yet have the TT entry for the
++destination of the DHCP response.
++
++Fixes: 9cbc67d9da47 ("batman-adv: change interface_rx to get orig node")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++---
++ net/batman-adv/send.c | 4 ++--
++ 1 file changed, 2 insertions(+), 2 deletions(-)
++
++diff --git a/net/batman-adv/send.c b/net/batman-adv/send.c
++index f2f1256..0103976 100644
++--- a/net/batman-adv/send.c
+++++ b/net/batman-adv/send.c
++@@ -424,8 +424,8 @@ int batadv_send_skb_via_gw(struct batadv_priv *bat_priv, struct sk_buff *skb,
++ 	struct batadv_orig_node *orig_node;
++ 
++ 	orig_node = batadv_gw_get_selected_orig(bat_priv);
++-	return batadv_send_skb_unicast(bat_priv, skb, BATADV_UNICAST, 0,
++-				       orig_node, vid);
+++	return batadv_send_skb_unicast(bat_priv, skb, BATADV_UNICAST_4ADDR,
+++				       BATADV_P_DATA, orig_node, vid);
++ }
++ 
++ void batadv_schedule_bat_ogm(struct batadv_hard_iface *hard_iface)
+diff --git a/batman-adv/patches/1001-batman-adv-introduce-no_rebroadcast-option.patch b/batman-adv/patches/1001-batman-adv-introduce-no_rebroadcast-option.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e9f5ffb4408fb07887aa5948e69e4db1ff05fb3b
+--- /dev/null
++++ b/batman-adv/patches/1001-batman-adv-introduce-no_rebroadcast-option.patch
+@@ -0,0 +1,189 @@
++From bb66988dc6972d5400b4ff4f0b49ed090007d635 Mon Sep 17 00:00:00 2001
++Message-Id: <bb66988dc6972d5400b4ff4f0b49ed090007d635.1466049319.git.mschiffer@universe-factory.net>
++From: =?UTF-8?q?Linus=20L=C3=BCssing?= <linus.luessing@web.de>
++Date: Tue, 24 Sep 2013 04:36:27 +0200
++Subject: [PATCH 1/2] batman-adv: introduce 'no_rebroadcast' option
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++This patch introduces a new sysfs option named "no_rebroadcast" on
++a per hard interface basis. It allows manually enabling a split-horizon
++like behaviour for the layer 2 multicast payload frames, in that
++incoming multicast payload frames on such a hard interface are only
++being rebroadcasted on all interfaces except the incoming one instead
++of being rebroadcasted on all interfaces.
++
++Such an option should only be enabled if you are certain that these
++rebroadcasts are unnecessary. This is usually the case for instance
++for point-to-point wifi longshots or wired links.
++
++This option can especially safe a significant amount of upload overhead
++if the neighbourhood on a link is rather large, for instance in some
++transitive, symmetric VPN configurations.
++
++Using this option wrongly will break your mesh network, use this option
++wisely and at your own risk!
++
++Signed-off-by: Linus Lüssing <linus.luessing@web.de>
++---
++ .../ABI/testing/sysfs-class-net-batman-adv         | 11 ++++
++ net/batman-adv/hard-interface.c                    |  2 +
++ net/batman-adv/send.c                              |  4 ++
++ net/batman-adv/sysfs.c                             | 59 ++++++++++++++++++++++
++ net/batman-adv/types.h                             |  1 +
++ 5 files changed, 77 insertions(+)
++
++diff --git a/Documentation/ABI/testing/sysfs-class-net-batman-adv b/Documentation/ABI/testing/sysfs-class-net-batman-adv
++index 518f6a1..896c480 100644
++--- a/Documentation/ABI/testing/sysfs-class-net-batman-adv
+++++ b/Documentation/ABI/testing/sysfs-class-net-batman-adv
++@@ -28,3 +28,14 @@ Description:
++                 The /sys/class/net/<iface>/batman-adv/mesh_iface file
++                 displays the batman mesh interface this <iface>
++                 currently is associated with.
+++
+++What:           /sys/class/net/<iface>/batman-adv/no_rebroadcast
+++Date:           Sep 2013
+++Contact:        Linus Lüssing <linus.luessing@web.de>
+++Description:
+++                With this option set incoming multicast payload frames on
+++                <iface> are not being rebroadcasted on <iface> again. This
+++                option should be set on links which are known to be transitive
+++                and symmetric only, for instance point-to-point wifi longshots
+++                or wired links. Using this option wrongly is going to
+++                break your mesh network, use at your own risk!
++diff --git a/net/batman-adv/hard-interface.c b/net/batman-adv/hard-interface.c
++index 8c2f399..48e53d0 100644
++--- a/net/batman-adv/hard-interface.c
+++++ b/net/batman-adv/hard-interface.c
++@@ -690,6 +690,8 @@ batadv_hardif_add_interface(struct net_device *net_dev)
++ 	kref_init(&hard_iface->refcount);
++ 	kref_get(&hard_iface->refcount);
++ 
+++	atomic_set(&hard_iface->no_rebroadcast, 0);
+++
++ 	batadv_check_known_mac_addr(hard_iface->net_dev);
++ 	list_add_tail_rcu(&hard_iface->list, &batadv_hardif_list);
++ 
++diff --git a/net/batman-adv/send.c b/net/batman-adv/send.c
++index f2f1256..3736d75 100644
++--- a/net/batman-adv/send.c
+++++ b/net/batman-adv/send.c
++@@ -578,6 +578,10 @@ static void batadv_send_outstanding_bcast_packet(struct work_struct *work)
++ 		if (forw_packet->num_packets >= hard_iface->num_bcasts)
++ 			continue;
++ 
+++		if (atomic_read(&hard_iface->no_rebroadcast) &&
+++		    forw_packet->skb->dev == hard_iface->net_dev)
+++			continue;
+++
++ 		if (!kref_get_unless_zero(&hard_iface->refcount))
++ 			continue;
++ 
++diff --git a/net/batman-adv/sysfs.c b/net/batman-adv/sysfs.c
++index 414b207..9aa043f 100644
++--- a/net/batman-adv/sysfs.c
+++++ b/net/batman-adv/sysfs.c
++@@ -134,6 +134,17 @@ struct batadv_attribute batadv_attr_vlan_##_name = {	\
++ 	.store  = _store,				\
++ }
++ 
+++/* Use this, if you have customized show and store functions
+++ * for hard interface attrs
+++ */
+++#define BATADV_ATTR_HIF(_name, _mode, _show, _store)	\
+++struct batadv_attribute batadv_attr_hif_##_name = {	\
+++	.attr = {.name = __stringify(_name),		\
+++		 .mode = _mode },			\
+++	.show   = _show,				\
+++	.store  = _store,				\
+++};
+++
++ /* Use this, if you have customized show and store functions */
++ #define BATADV_ATTR(_name, _mode, _show, _store)	\
++ struct batadv_attribute batadv_attr_##_name = {		\
++@@ -293,6 +304,52 @@ ssize_t batadv_show_##_name(struct kobject *kobj,			\
++ 	static BATADV_ATTR(_name, _mode, batadv_show_##_name,		\
++ 			   batadv_store_##_name)
++ 
+++#define BATADV_ATTR_HIF_STORE_BOOL(_name, _post_func)			\
+++ssize_t batadv_store_hif_##_name(struct kobject *kobj,			\
+++				 struct attribute *attr, char *buff,	\
+++				 size_t count)				\
+++{									\
+++	struct net_device *net_dev = batadv_kobj_to_netdev(kobj);	\
+++	struct batadv_hard_iface *hard_iface;				\
+++	size_t res;							\
+++									\
+++	hard_iface = batadv_hardif_get_by_netdev(net_dev);		\
+++	if (!hard_iface)						\
+++		return 0;						\
+++									\
+++	res = __batadv_store_bool_attr(buff, count, _post_func,		\
+++					      attr, &hard_iface->_name,	\
+++					      hard_iface->soft_iface);	\
+++	batadv_hardif_put(hard_iface);					\
+++	return res;							\
+++}
+++
+++#define BATADV_ATTR_HIF_SHOW_BOOL(_name)				\
+++ssize_t batadv_show_hif_##_name(struct kobject *kobj,			\
+++				struct attribute *attr, char *buff)	\
+++{									\
+++	struct net_device *net_dev = batadv_kobj_to_netdev(kobj);	\
+++	struct batadv_hard_iface *hard_iface;				\
+++	size_t res;							\
+++									\
+++	hard_iface = batadv_hardif_get_by_netdev(net_dev);		\
+++	if (!hard_iface)						\
+++		return 0;						\
+++									\
+++	res = sprintf(buff, "%s\n",					\
+++		      atomic_read(&hard_iface->_name) == 0 ?		\
+++				"disabled" : "enabled");		\
+++	batadv_hardif_put(hard_iface);					\
+++	return res;							\
+++}
+++
+++/* Use this, if you are going to turn a [name] in the vlan struct on or off */
+++#define BATADV_ATTR_HIF_BOOL(_name, _mode, _post_func)			\
+++	static BATADV_ATTR_HIF_STORE_BOOL(_name, _post_func)		\
+++	static BATADV_ATTR_HIF_SHOW_BOOL(_name)				\
+++	static BATADV_ATTR_HIF(_name, _mode, batadv_show_hif_##_name,	\
+++			       batadv_store_hif_##_name)
+++
++ static int batadv_store_bool_attr(char *buff, size_t count,
++ 				  struct net_device *net_dev,
++ 				  const char *attr_name, atomic_t *attr,
++@@ -993,6 +1050,7 @@ static ssize_t batadv_show_throughput_override(struct kobject *kobj,
++ static BATADV_ATTR(mesh_iface, S_IRUGO | S_IWUSR, batadv_show_mesh_iface,
++ 		   batadv_store_mesh_iface);
++ static BATADV_ATTR(iface_status, S_IRUGO, batadv_show_iface_status, NULL);
+++BATADV_ATTR_HIF_BOOL(no_rebroadcast, S_IRUGO | S_IWUSR, NULL);
++ #ifdef CONFIG_BATMAN_ADV_BATMAN_V
++ BATADV_ATTR_HIF_UINT(elp_interval, bat_v.elp_interval, S_IRUGO | S_IWUSR,
++ 		     2 * BATADV_JITTER, INT_MAX, NULL);
++@@ -1004,6 +1062,7 @@ static BATADV_ATTR(throughput_override, S_IRUGO | S_IWUSR,
++ static struct batadv_attribute *batadv_batman_attrs[] = {
++ 	&batadv_attr_mesh_iface,
++ 	&batadv_attr_iface_status,
+++	&batadv_attr_hif_no_rebroadcast,
++ #ifdef CONFIG_BATMAN_ADV_BATMAN_V
++ 	&batadv_attr_elp_interval,
++ 	&batadv_attr_throughput_override,
++diff --git a/net/batman-adv/types.h b/net/batman-adv/types.h
++index ba846b0..1a596c5 100644
++--- a/net/batman-adv/types.h
+++++ b/net/batman-adv/types.h
++@@ -156,6 +156,7 @@ struct batadv_hard_iface {
++ 	struct hlist_head neigh_list;
++ 	/* neigh_list_lock protects: neigh_list */
++ 	spinlock_t neigh_list_lock;
+++	atomic_t no_rebroadcast;
++ };
++ 
++ /**
++-- 
++2.8.3
++
+diff --git a/batman-adv/patches/1002-batman-adv-decrease-maximum-fragment-size.patch b/batman-adv/patches/1002-batman-adv-decrease-maximum-fragment-size.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..a97146beb82d473e8dec3252ea9ae6b4db6df1ff
+--- /dev/null
++++ b/batman-adv/patches/1002-batman-adv-decrease-maximum-fragment-size.patch
+@@ -0,0 +1,28 @@
++From 9e7384fde3c5a71f733221a137fdc4593a9638be Mon Sep 17 00:00:00 2001
++Message-Id: <9e7384fde3c5a71f733221a137fdc4593a9638be.1466048916.git.mschiffer@universe-factory.net>
++In-Reply-To: <8e4c2084bbf2a65ad663a2b1ba27144e5dadfd5f.1466048916.git.mschiffer@universe-factory.net>
++References: <8e4c2084bbf2a65ad663a2b1ba27144e5dadfd5f.1466048916.git.mschiffer@universe-factory.net>
++From: Matthias Schiffer <mschiffer@universe-factory.net>
++Date: Thu, 6 Aug 2015 22:27:01 +0200
++Subject: [PATCH 2/2] batman-adv: decrease maximum fragment size
++
++---
++ net/batman-adv/main.h | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/net/batman-adv/main.h b/net/batman-adv/main.h
++index 7692526..d314e6c 100644
++--- a/net/batman-adv/main.h
+++++ b/net/batman-adv/main.h
++@@ -159,7 +159,7 @@ enum batadv_uev_type {
++ /* Maximum number of fragments for one packet */
++ #define BATADV_FRAG_MAX_FRAGMENTS 16
++ /* Maxumim size of each fragment */
++-#define BATADV_FRAG_MAX_FRAG_SIZE 1400
+++#define BATADV_FRAG_MAX_FRAG_SIZE 1280
++ /* Time to keep fragments while waiting for rest of the fragments */
++ #define BATADV_FRAG_TIMEOUT 10000
++ 
++-- 
++2.8.3
++
+diff --git a/batman-adv/patches/1003-batman-adv-Fix-double-free-during-fragment-merge-err.patch b/batman-adv/patches/1003-batman-adv-Fix-double-free-during-fragment-merge-err.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..42748aac79d082e67a8552690b3aa6e7f5ec7d12
+--- /dev/null
++++ b/batman-adv/patches/1003-batman-adv-Fix-double-free-during-fragment-merge-err.patch
+@@ -0,0 +1,41 @@
++From ee1415285ddb56a3c15b5b70d7b403637486382c Mon Sep 17 00:00:00 2001
++Message-Id: <ee1415285ddb56a3c15b5b70d7b403637486382c.1490704674.git.mschiffer@universe-factory.net>
++From: Matthias Schiffer <mschiffer@universe-factory.net>
++Date: Tue, 28 Mar 2017 14:35:12 +0200
++Subject: [PATCH] batman-adv: Fix double free during fragment merge error
++
++The function batadv_frag_skb_buffer was supposed not to consume the skbuff
++on errors. This was followed in the helper function
++batadv_frag_insert_packet when the skb would potentially be inserted in the
++fragment queue. But it could happen that the next helper function
++batadv_frag_merge_packets would try to merge the fragments and fail. This
++results in a kfree_skb of all the enqueued fragments (including the just
++inserted one). batadv_recv_frag_packet would detect the error in
++batadv_frag_skb_buffer and try to free the skb again.
++
++The behavior of batadv_frag_skb_buffer must therefore be changed to return
++true when batadv_frag_merge_packets fails.
++
++Fixes: 9b3eab61754d ("batman-adv: Receive fragmented packets and merge")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++[Matthias Schiffer: backport to batman-adv 2016.2]
++---
++ net/batman-adv/fragmentation.c | 2 --
++ 1 file changed, 2 deletions(-)
++
++diff --git a/net/batman-adv/fragmentation.c b/net/batman-adv/fragmentation.c
++index 65536db1..21e5b79f 100644
++--- a/net/batman-adv/fragmentation.c
+++++ b/net/batman-adv/fragmentation.c
++@@ -326,8 +326,6 @@ bool batadv_frag_skb_buffer(struct sk_buff **skb,
++ 		goto out;
++ 
++ 	skb_out = batadv_frag_merge_packets(&head);
++-	if (!skb_out)
++-		goto out_err;
++ 
++ out:
++ 	*skb = skb_out;
++-- 
++2.12.1
++
+diff --git a/batman-adv/patches/1004-batman-adv-Keep-fragments-equally-sized.patch b/batman-adv/patches/1004-batman-adv-Keep-fragments-equally-sized.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..431c0b4a1a722c4c2ebae390bc0c90be18966023
+--- /dev/null
++++ b/batman-adv/patches/1004-batman-adv-Keep-fragments-equally-sized.patch
+@@ -0,0 +1,112 @@
++From 450247570eacc8b6cf5484fe61c50eff804c6416 Mon Sep 17 00:00:00 2001
++Message-Id: <450247570eacc8b6cf5484fe61c50eff804c6416.1489082253.git.mschiffer@universe-factory.net>
++From: Sven Eckelmann <sven@narfation.org>
++Date: Sat, 4 Mar 2017 17:29:25 +0100
++Subject: [PATCH] batman-adv: Keep fragments equally sized
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++The batman-adv fragmentation packets have the design problem that they
++cannot be refragmented and cannot handle padding by the underlying link.
++The latter often leads to problems when networks are incorrectly configured
++and don't use a common MTU.
++
++The sender could for example fragment a 1271 byte frame (plus external
++ethernet header (14) and batadv unicast header (10)) to fit in a 1280 bytes
++large MTU of the underlying link (max. 1294 byte frames). This would create
++a 1294 bytes large frame (fragment 2) and a 55 bytes large frame
++(fragment 1). The extra 54 bytes are the fragment header (20) added to each
++fragment and the external ethernet header (14) for the second fragment.
++
++Let us assume that the next hop is then not able to transport 1294 bytes to
++its next hop. The 1294 byte large frame will be dropped but the 55 bytes
++large fragment will still be forwarded to its destination.
++
++Or let us assume that the underlying hardware requires that each frame has
++a minimum size (e.g. 60 bytes). Then it will pad the 55 bytes frame to 60
++bytes. The receiver of the 60 bytes frame will no longer be able to
++correctly assemble the two frames together because it is not aware that 5
++bytes of the 60 bytes frame are padding and don't belong to the reassembled
++frame.
++
++This can partly be avoided by splitting frames more equally. In this
++example, the 675 and 674 bytes large fragment frames could both potentially
++reach its destination without being too large or too small.
++
++Reported-by: Martin Weinelt <martin@darmstadt.freifunk.net>
++Fixes: db56e4ecf5c2 ("batman-adv: Fragment and send skbs larger than mtu")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++Acked-by: Linus Lüssing <linus.luessing@c0d3.blue>
++Signed-off-by: Simon Wunderlich <sw@simonwunderlich.de>
++---
++ net/batman-adv/fragmentation.c | 20 +++++++++++++-------
++ 1 file changed, 13 insertions(+), 7 deletions(-)
++
++diff --git a/net/batman-adv/fragmentation.c b/net/batman-adv/fragmentation.c
++index c3e293a3..89882ed7 100644
++--- a/net/batman-adv/fragmentation.c
+++++ b/net/batman-adv/fragmentation.c
++@@ -396,7 +396,7 @@ out:
++  * batadv_frag_create - create a fragment from skb
++  * @skb: skb to create fragment from
++  * @frag_head: header to use in new fragment
++- * @mtu: size of new fragment
+++ * @fragment_size: size of new fragment
++  *
++  * Split the passed skb into two fragments: A new one with size matching the
++  * passed mtu and the old one with the rest. The new skb contains data from the
++@@ -406,11 +406,11 @@ out:
++  */
++ static struct sk_buff *batadv_frag_create(struct sk_buff *skb,
++ 					  struct batadv_frag_packet *frag_head,
++-					  unsigned int mtu)
+++					  unsigned int fragment_size)
++ {
++ 	struct sk_buff *skb_fragment;
++ 	unsigned int header_size = sizeof(*frag_head);
++-	unsigned int fragment_size = mtu - header_size;
+++	unsigned int mtu = fragment_size + header_size;
++ 
++ 	skb_fragment = netdev_alloc_skb(NULL, mtu + ETH_HLEN);
++ 	if (!skb_fragment)
++@@ -448,7 +448,7 @@ bool batadv_frag_send_packet(struct sk_buff *skb,
++ 	struct sk_buff *skb_fragment;
++ 	unsigned int mtu = neigh_node->if_incoming->net_dev->mtu;
++ 	unsigned int header_size = sizeof(frag_header);
++-	unsigned int max_fragment_size, max_packet_size;
+++	unsigned int max_fragment_size, num_fragments;
++ 	bool ret = false;
++ 
++ 	/* To avoid merge and refragmentation at next-hops we never send
++@@ -456,10 +456,15 @@ bool batadv_frag_send_packet(struct sk_buff *skb,
++ 	 */
++ 	mtu = min_t(unsigned int, mtu, BATADV_FRAG_MAX_FRAG_SIZE);
++ 	max_fragment_size = mtu - header_size;
++-	max_packet_size = max_fragment_size * BATADV_FRAG_MAX_FRAGMENTS;
+++
+++	if (skb->len == 0 || max_fragment_size == 0)
+++		return -EINVAL;
+++
+++	num_fragments = (skb->len - 1) / max_fragment_size + 1;
+++	max_fragment_size = (skb->len - 1) / num_fragments + 1;
++ 
++ 	/* Don't even try to fragment, if we need more than 16 fragments */
++-	if (skb->len > max_packet_size)
+++	if (num_fragments > BATADV_FRAG_MAX_FRAGMENTS)
++ 		goto out_err;
++ 
++ 	bat_priv = orig_node->bat_priv;
++@@ -480,7 +485,8 @@ bool batadv_frag_send_packet(struct sk_buff *skb,
++ 
++ 	/* Eat and send fragments from the tail of skb */
++ 	while (skb->len > max_fragment_size) {
++-		skb_fragment = batadv_frag_create(skb, &frag_header, mtu);
+++		skb_fragment = batadv_frag_create(skb, &frag_header,
+++						  max_fragment_size);
++ 		if (!skb_fragment)
++ 			goto out_err;
++ 
++-- 
++2.12.0
++
