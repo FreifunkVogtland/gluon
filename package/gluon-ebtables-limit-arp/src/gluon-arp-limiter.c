@@ -171,10 +171,11 @@ static void ebt_dat_update(void)
 		return;
 	}
 	
-	while (!feof(fp)) {
+	while (1) {
 		pline = fgets(line, sizeof(line), fp);
 		if (!pline) {
-			fprintf(stderr, "%i: Error: fgets() failed\n", clock);
+			if (!feof(fp))
+				fprintf(stderr, "%i: Error: fgets() failed\n", clock);
 			break;
 		}
 
@@ -232,19 +233,11 @@ static void ebt_tl_update(void)
 		return;
 	}
 
-	// Throw away a header line
-	pline = fgets(line, sizeof(line), fp);
-	if (!pline) {
-		fprintf(stderr,
-			"%i: Error: Could not get a line from batctl tl\n",
-			clock);
-		return;
-	}
-
-	while (!feof(fp)) {
+	while (1) {
 		pline = fgets(line, sizeof(line), fp);
 		if (!pline) {
-			fprintf(stderr, "%i: Error: fgets() failed\n", clock);
+			if (!feof(fp))
+				fprintf(stderr, "%i: Error: fgets() failed\n", clock);
 			break;
 		}
 

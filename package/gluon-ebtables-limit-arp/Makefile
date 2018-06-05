@@ -12,7 +12,7 @@ define Package/gluon-ebtables-limit-arp
   SECTION:=gluon
   CATEGORY:=Gluon
   TITLE:=Ebtables limiter for ARP packets
-  DEPENDS:=+gluon-core +gluon-ebtables
+  DEPENDS:=+gluon-core +gluon-ebtables gluon-mesh-batman-adv
 endef
 
 define Package/gluon-ebtables-limit-arp/description
