@@ -122,6 +122,12 @@ device onion-omega onion-omega
 # OpenMesh
 
 if [ "$ATH10K_PACKAGES" ]; then
+device openmesh-a60 a60 A60
+alias openmesh-a40
+packages $ATH10K_PACKAGES
+fi
+
+if [ "$ATH10K_PACKAGES" ]; then
 device openmesh-mr1750 mr1750 MR1750
 alias openmesh-mr1750v2
 packages $ATH10K_PACKAGES
