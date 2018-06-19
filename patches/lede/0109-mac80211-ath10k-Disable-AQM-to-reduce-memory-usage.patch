@@ -1,0 +1,30 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 19 Jun 2018 14:11:59 +0200
+Subject: mac80211: ath10k: Disable AQM to reduce memory usage
+
+The AQM implementation in mac80211 is currently suspected to have an
+important role in the (out of) memory problems on devices which are already
+low on memory. Disabling it will allow users to run some tests without
+switching to a completely different mac80211 package version or ath10k
+driver.
+
+Forwarded: no
+
+diff --git a/package/kernel/mac80211/patches/961-ath10k-disable-aqm.patch b/package/kernel/mac80211/patches/961-ath10k-disable-aqm.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..29c01c918d648e966403089af363b6ecbaf18a68
+--- /dev/null
++++ b/package/kernel/mac80211/patches/961-ath10k-disable-aqm.patch
+@@ -0,0 +1,12 @@
++--- a/drivers/net/wireless/ath/ath10k/mac.c
+++++ b/drivers/net/wireless/ath/ath10k/mac.c
++@@ -8234,6 +8234,9 @@ int ath10k_mac_register(struct ath10k *a
++ 			ath10k_warn(ar, "failed to initialise DFS pattern detector\n");
++ 	}
++ 
+++	/* TODO only disable AQM on some external trigger (module_param?) */
+++	ar->ops->wake_tx_queue = NULL;
+++
++ 	/* Current wake_tx_queue implementation imposes a significant
++ 	 * performance penalty in some setups. The tx scheduling code needs
++ 	 * more work anyway so disable the wake_tx_queue unless firmware

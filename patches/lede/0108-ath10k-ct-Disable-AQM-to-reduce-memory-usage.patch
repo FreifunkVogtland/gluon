@@ -1,0 +1,29 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 19 Jun 2018 14:11:59 +0200
+Subject: ath10k-ct: Disable AQM to reduce memory usage
+
+The AQM implementation in mac80211 is currently suspected to have an
+important role in the (out of) memory problems on devices which are already
+low on memory. Disabling it will allow users to run some tests without
+switching to a completely different mac80211 package version or ath10k
+driver.
+
+Forwarded: no
+
+diff --git a/package/kernel/ath10k-ct/patches/961-ath10k-disable-aqm.patch b/package/kernel/ath10k-ct/patches/961-ath10k-disable-aqm.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..2754d7db1940701e9089586628354c087c6e6b18
+--- /dev/null
++++ b/package/kernel/ath10k-ct/patches/961-ath10k-disable-aqm.patch
+@@ -0,0 +1,11 @@
++--- a/ath10k/mac.c
+++++ b/ath10k/mac.c
++@@ -8139,7 +8139,7 @@ static void ath10k_mac_op_sta_pre_rcu_re
++ 
++ static const struct ieee80211_ops ath10k_ops = {
++ 	.tx				= ath10k_mac_op_tx,
++-	.wake_tx_queue			= ath10k_mac_op_wake_tx_queue,
+++	.wake_tx_queue			= NULL,
++ 	.start				= ath10k_start,
++ 	.stop				= ath10k_stop,
++ 	.config				= ath10k_config,
