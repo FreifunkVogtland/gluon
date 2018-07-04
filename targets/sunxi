@@ -1,3 +1,5 @@
+config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
+
 factory -ext4-sdcard .img.gz
 sysupgrade -ext4-sdcard .img.gz
 

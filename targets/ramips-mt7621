@@ -1,3 +1,5 @@
+config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
+
 # BROKEN: No AP+IBSS support (plus individual issues)
 if [ "$BROKEN" ]; then
 

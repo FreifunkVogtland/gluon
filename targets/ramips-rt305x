@@ -1,3 +1,5 @@
+config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
+
 # A5
 
 device a5-v11 a5-v11

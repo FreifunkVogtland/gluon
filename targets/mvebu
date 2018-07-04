@@ -1,2 +1,4 @@
+config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
+
 device linksys-wrt1200ac linksys-wrt1200ac
 factory .img

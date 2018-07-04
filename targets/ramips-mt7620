@@ -1,3 +1,5 @@
+config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
+
 # GL Innovations
 device gl-mt300a gl-mt300a
 factory

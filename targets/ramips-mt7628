@@ -1,3 +1,5 @@
+config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
+
 # VoCore 2
 
 device vocore2 vocore2
