@@ -10,6 +10,7 @@ local dnsmasq = uci:get_first("dhcp", "dnsmasq")
 
 uci:set('dhcp', dnsmasq, 'localise_queries', true)
 uci:set('dhcp', dnsmasq, 'localservice', false)
+uci:set('dhcp', dnsmasq, 'allservers', true)
 
 uci:set('dhcp', dnsmasq, 'server', dns.servers)
 uci:delete('dhcp', dnsmasq, 'cachesize')
