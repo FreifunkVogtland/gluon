@@ -1,0 +1,72 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 11 Sep 2018 20:07:09 +0200
+Subject: batman-adv: Enable LockLess TX for softif
+
+The batadv interfaces are virtual interfaces which just tunnel the traffic
+over other ethernet compatible interfaces. It doesn't need serialization
+during the tx phase and is using RCU for most of its internal
+datastructures. Since it doesn't have actual queues which could be locked
+independently, the throughput gets significantly reduced by the extra lock
+in the core net code.
+
+8 parallel TCP connections forwarded by an IPQ4019 based hardware over
+5GHz could reach:
+
+* without LLTX: 349 Mibit/s
+* with LLTX:    563 Mibit/s
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batman-adv/patches/1002-batman-adv-Enable-LockLess-TX-for-softif.patch b/batman-adv/patches/1002-batman-adv-Enable-LockLess-TX-for-softif.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c20a6dec6ccd0d1671317fa28d8ad00975125e1
+--- /dev/null
++++ b/batman-adv/patches/1002-batman-adv-Enable-LockLess-TX-for-softif.patch
+@@ -0,0 +1,47 @@
++From patchwork Tue Sep 11 15:59:42 2018
++Content-Type: text/plain; charset="utf-8"
++MIME-Version: 1.0
++Content-Transfer-Encoding: 7bit
++Subject: batman-adv: Enable LockLess TX for softif
++X-Patchwork-Submitter: Sven Eckelmann <sven@narfation.org>
++X-Patchwork-Id: 17482
++X-Patchwork-Delegate: sw@simonwunderlich.de
++Message-Id: <20180911155942.15494-1-sven@narfation.org>
++To: b.a.t.m.a.n@lists.open-mesh.org
++Date: Tue, 11 Sep 2018 17:59:42 +0200
++From: Sven Eckelmann <sven@narfation.org>
++List-Id: The list for a Better Approach To Mobile Ad-hoc Networking
++ <b.a.t.m.a.n.lists.open-mesh.org>
++
++The batadv interfaces are virtual interfaces which just tunnel the traffic
++over other ethernet compatible interfaces. It doesn't need serialization
++during the tx phase and is using RCU for most of its internal
++datastructures. Since it doesn't have actual queues which could be locked
++independently, the throughput gets significantly reduced by the extra lock
++in the core net code.
++
++8 parallel TCP connections forwarded by an IPQ4019 based hardware over
++5GHz could reach:
++
++* without LLTX: 349 Mibit/s
++* with LLTX:    563 Mibit/s
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Forwarded: https://patchwork.open-mesh.org/patch/17482/
++---
++ net/batman-adv/soft-interface.c | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/net/batman-adv/soft-interface.c b/net/batman-adv/soft-interface.c
++index 626ddca3..b1596c23 100644
++--- a/net/batman-adv/soft-interface.c
+++++ b/net/batman-adv/soft-interface.c
++@@ -1062,6 +1062,7 @@ static void batadv_softif_init_early(struct net_device *dev)
++ 	dev->needs_free_netdev = true;
++ 	dev->priv_destructor = batadv_softif_free;
++ 	dev->features |= NETIF_F_HW_VLAN_CTAG_FILTER | NETIF_F_NETNS_LOCAL;
+++	dev->features |= NETIF_F_LLTX;
++ 	dev->priv_flags |= IFF_NO_QUEUE;
++ 
++ 	/* can't call min_mtu, because the needed variables
