@@ -1,0 +1,108 @@
+From: Koen Vandeputte <koen.vandeputte@ncentric.com>
+Date: Mon, 2 Jul 2018 10:23:44 +0200
+Subject: mac80211: Expose support for ath9k Dynack
+
+Enables support for Dynack feature.
+
+When a remote station is far away, we need to compensate for the distance
+by allowing more time for an ACK to arrive back before issueing a retransmission.
+Currently, it needs to be set fixed to indicate the maximum distance the remote
+station will ever be.
+
+While this mostly works for static antennae, it introduces 2 issues:
+- If the actual distance is less, speed is reduced due to a lot of wates wait-time
+- If the distance becomes greater, retries start to occur and comms can get lost.
+
+Allowing to set it dynamically using dynack ensures the best possible tradeoff
+between speed vs distance.
+
+This feature is currently only supported in ath9k.
+it is also disabled by default.
+
+Enabling it can be done in 2 ways:
+- issue cmd:  iw phy0 set distance auto
+- sending the NL80211_ATTR_WIPHY_DYN_ACK flag to mac80211 driver using netlink
+
+Disabling it can be done by providing a valid fixed value.
+
+To give an idea of a practical example:
+
+In my usecase, we have mesh wifi device installed on ships/platforms.
+Currently, the coverage class is set at 12000m fixed.
+
+When a vessel moved closer (ex. 1500m), the measured link capacity was a lot
+lower compared to setting the coverage class fixed to 1500m
+
+Dynack completely solved this, nearly providing double the bandwidth at closer range
+compared to the fixed setting of 12000m being used.
+
+Also when a vessel sailed to a distance greater than the fixed setting,
+communication was lost as the ACK's never arrived within the max allowed timeframe.
+
+Actual distance: 6010m
+iperf 60s run avg
+
+Fixed 12150m:  31 Mbit/s
+Dynack:        58 Mbit/s
+
+Fixed 6300m:   51 Mbit/s
+Dynack:        59 Mbit/s
+
+Fixed 3000m:   13 Mbit/s  (lots of retries)
+Dynack:        58 Mbit/s
+
+Actual distance: 1504m
+iperf 60s run avg
+
+Fixed 12150m:  31 Mbit/s
+Dynack:        86 Mbit/s
+
+Fixed 6300m:   55 Mbit/s
+Dynack:        87 Mbit/s
+
+Fixed 3000m:   67 Mbit/s
+Dynack:        87 Mbit/s
+
+Signed-off-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
+
+Origin: backport, https://git.openwrt.org/?p=openwrt/openwrt.git;a=commit;h=8b42a260ed8ff6809cd0ade20a5c1fa003feb6d0
+
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 0cdce6386db78cb72883d32bd6c00ccba1325083..373fadd33f2087321669afc7386d52fbec721c26 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -56,6 +56,7 @@ PKG_CONFIG_DEPENDS:= \
+ 	CONFIG_PACKAGE_MAC80211_TRACING \
+ 	CONFIG_PACKAGE_ATH_DEBUG \
+ 	CONFIG_PACKAGE_ATH_DFS \
++	CONFIG_PACKAGE_ATH_DYNACK \
+ 	CONFIG_PACKAGE_B43_DEBUG \
+ 	CONFIG_PACKAGE_B43_PIO \
+ 	CONFIG_PACKAGE_B43_PHY_G \
+@@ -188,6 +189,17 @@ define KernelPackage/ath/config
+ 
+ 		  Select this option if you want to use such channels.
+ 
++	config PACKAGE_ATH_DYNACK
++		bool "Enable Dynack support"
++		depends on PACKAGE_kmod-ath9k-common
++		help
++		  Enables support for Dynamic ACK estimation, which allows the fastest possible speed
++		  at any distance automatically by increasing/decreasing the max frame ACK time for
++		  the most remote station detected.  It can be enabled by using iw (iw phy0 set distance auto),
++		  or by sending the NL80211_ATTR_WIPHY_DYN_ACK flag to mac80211 driver using netlink.
++
++		  Select this option if you want to enable this feature
++
+   endif
+ endef
+ 
+@@ -1517,7 +1529,7 @@ config-$(call config_package,airo) += AIRO
+ config-$(call config_package,ath) += ATH_CARDS ATH_COMMON
+ config-$(CONFIG_PACKAGE_ATH_DEBUG) += ATH_DEBUG ATH10K_DEBUG ATH9K_STATION_STATISTICS
+ config-$(CONFIG_PACKAGE_ATH_DFS) += ATH9K_DFS_CERTIFIED ATH10K_DFS_CERTIFIED
+-
++config-$(CONFIG_PACKAGE_ATH_DYNACK) += ATH9K_DYNACK
+ config-$(call config_package,ath9k) += ATH9K
+ config-$(call config_package,ath9k-common) += ATH9K_COMMON
+ config-$(CONFIG_TARGET_ar71xx) += ATH9K_AHB

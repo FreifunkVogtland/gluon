@@ -1,0 +1,43 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sun, 14 Oct 2018 20:03:17 +0200
+Subject: mac80211: Enable ath9k dynack by default
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+Forwarded: no
+
+diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
+index 373fadd33f2087321669afc7386d52fbec721c26..4fe7aa57a59a0f647777be19d8ab3b6e839992e2 100644
+--- a/package/kernel/mac80211/Makefile
++++ b/package/kernel/mac80211/Makefile
+@@ -192,6 +192,7 @@ define KernelPackage/ath/config
+ 	config PACKAGE_ATH_DYNACK
+ 		bool "Enable Dynack support"
+ 		depends on PACKAGE_kmod-ath9k-common
++		default y
+ 		help
+ 		  Enables support for Dynamic ACK estimation, which allows the fastest possible speed
+ 		  at any distance automatically by increasing/decreasing the max frame ACK time for
+diff --git a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+index 703609b1475449c4c70a50fe305db2fbab4b21ce..e194ae8befdb4003f1eb32b44ed0ecb56567f5c5 100644
+--- a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
++++ b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+@@ -771,12 +771,16 @@ drv_mac80211_setup() {
+ 
+ 	set_default rxantenna all
+ 	set_default txantenna all
+-	set_default distance 0
+ 	set_default antenna_gain 0
+ 
+ 	iw phy "$phy" set antenna $txantenna $rxantenna >/dev/null 2>&1
+ 	iw phy "$phy" set antenna_gain $antenna_gain
+-	iw phy "$phy" set distance "$distance"
++
++	if [ -n "$distance" ]; then
++		iw phy "$phy" set distance "$distance"
++	else
++		iw phy "$phy" set distance auto || iw phy "$phy" set distance 0
++	fi
+ 
+ 	[ -n "$frag" ] && iw phy "$phy" set frag "${frag%%.*}"
+ 	[ -n "$rts" ] && iw phy "$phy" set rts "${rts%%.*}"
