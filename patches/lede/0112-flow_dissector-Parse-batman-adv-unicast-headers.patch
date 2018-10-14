@@ -1,0 +1,143 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sun, 14 Oct 2018 19:58:12 +0200
+Subject: flow_dissector: Parse batman-adv unicast headers
+
+The batman-adv unicast packets contain a full layer 2 frame in encapsulated
+form. The flow dissector must therefore be able to parse the batman-adv
+unicast header to reach the layer 2+3 information to allow RPS to schedule
+the flow to different cores.
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+Forwarded: https://patchwork.open-mesh.org/patch/17245/
+
+diff --git a/target/linux/generic/patches-3.18/682-flow_dissector-Parse-batman-adv-unicast-headers.patch b/target/linux/generic/patches-3.18/682-flow_dissector-Parse-batman-adv-unicast-headers.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e31c2e5e7d54d679dfd4050566d97ff2d66695f
+--- /dev/null
++++ b/target/linux/generic/patches-3.18/682-flow_dissector-Parse-batman-adv-unicast-headers.patch
+@@ -0,0 +1,59 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Mon, 27 Nov 2017 11:18:08 +0100
++Subject: [PATCH] flow_dissector: Parse batman-adv unicast headers
++
++The batman-adv unicast packets contain a full layer 2 frame in encapsulated
++form. The flow dissector must therefore be able to parse the batman-adv
++unicast header to reach the layer 2+3 information to allow RPS to schedule
++the flow to different cores.
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Forwarded: https://patchwork.open-mesh.org/patch/17245/
++---
++ net/core/flow_dissector.c | 32 ++++++++++++++++++++++++++++++++
++ 1 file changed, 32 insertions(+)
++
++diff --git a/net/core/flow_dissector.c b/net/core/flow_dissector.c
++index 45084938c403b82b23d45ed66d9871348baeadc7..4467e975a1bab683b9dd36b1a3c4dadc753539e2 100644
++--- a/net/core/flow_dissector.c
+++++ b/net/core/flow_dissector.c
++@@ -146,6 +146,38 @@ ipv6:
++ 
++ 		break;
++ 	}
+++	case htons(ETH_P_BATMAN): {
+++		/* TODO provide struct in include/uapi/... header */
+++		struct batadv_unicast_packet {
+++			u8 packet_type;
+++			u8 version;
+++			u8 ttl;
+++			u8 ttvn;
+++			u8 dest[ETH_ALEN];
+++		};
+++
+++		struct {
+++			struct batadv_unicast_packet batadv_unicast;
+++			struct ethhdr eth;
+++		} *hdr, _hdr;
+++
+++		hdr = __skb_header_pointer(skb, nhoff, sizeof(_hdr), data, hlen, &_hdr);
+++		if (!hdr)
+++			goto out_bad;
+++
+++		if (hdr->batadv_unicast.version != 15)
+++			break;
+++
+++		if (hdr->batadv_unicast.packet_type != 0x40)
+++			break;
+++
+++		/* TODO set batman-adv dest address? */
+++
+++		proto = hdr->eth.h_proto;
+++		nhoff += sizeof(*hdr);
+++
+++		goto again;
+++	}
++ 	case htons(ETH_P_8021AD):
++ 	case htons(ETH_P_8021Q): {
++ 		const struct vlan_hdr *vlan;
+diff --git a/target/linux/generic/patches-4.4/682-flow_dissector-Parse-batman-adv-unicast-headers.patch b/target/linux/generic/patches-4.4/682-flow_dissector-Parse-batman-adv-unicast-headers.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..a62b7ca459a6705df87e8e4c2947305d2d9382de
+--- /dev/null
++++ b/target/linux/generic/patches-4.4/682-flow_dissector-Parse-batman-adv-unicast-headers.patch
+@@ -0,0 +1,59 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Mon, 27 Nov 2017 11:18:08 +0100
++Subject: [PATCH] flow_dissector: Parse batman-adv unicast headers
++
++The batman-adv unicast packets contain a full layer 2 frame in encapsulated
++form. The flow dissector must therefore be able to parse the batman-adv
++unicast header to reach the layer 2+3 information to allow RPS to schedule
++the flow to different cores.
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Forwarded: https://patchwork.open-mesh.org/patch/17245/
++---
++ net/core/flow_dissector.c | 32 ++++++++++++++++++++++++++++++++
++ 1 file changed, 32 insertions(+)
++
++diff --git a/net/core/flow_dissector.c b/net/core/flow_dissector.c
++index 4d14908afaec48b54b441ceb2e9df237882d1812..5c7118886eccb107793d341f239f8658b8bc9061 100644
++--- a/net/core/flow_dissector.c
+++++ b/net/core/flow_dissector.c
++@@ -251,6 +251,38 @@ ipv6:
++ 
++ 		break;
++ 	}
+++	case htons(ETH_P_BATMAN): {
+++		/* TODO provide struct in include/uapi/... header */
+++		struct batadv_unicast_packet {
+++			u8 packet_type;
+++			u8 version;
+++			u8 ttl;
+++			u8 ttvn;
+++			u8 dest[ETH_ALEN];
+++		};
+++
+++		struct {
+++			struct batadv_unicast_packet batadv_unicast;
+++			struct ethhdr eth;
+++		} *hdr, _hdr;
+++
+++		hdr = __skb_header_pointer(skb, nhoff, sizeof(_hdr), data, hlen, &_hdr);
+++		if (!hdr)
+++			goto out_bad;
+++
+++		if (hdr->batadv_unicast.version != 15)
+++			break;
+++
+++		if (hdr->batadv_unicast.packet_type != 0x40)
+++			break;
+++
+++		/* TODO set batman-adv dest address? */
+++
+++		proto = hdr->eth.h_proto;
+++		nhoff += sizeof(*hdr);
+++
+++		goto again;
+++	}
++ 	case htons(ETH_P_8021AD):
++ 	case htons(ETH_P_8021Q): {
++ 		const struct vlan_hdr *vlan;
