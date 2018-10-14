@@ -1,0 +1,199 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sun, 14 Oct 2018 19:58:12 +0200
+Subject: flow_dissector: Parse batman-adv unicast headers
+
+The batman-adv unicast packets contain a full layer 2 frame in encapsulated
+form. The flow dissector must therefore be able to parse the batman-adv
+unicast header to reach the layer 2+3 information to allow RPS to schedule
+the flow to different cores.
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+Forwarded: https://patchwork.open-mesh.org/patch/17245/
+
+diff --git a/target/linux/generic/hack-4.14/9501-flow_dissector-Parse-batman-adv-unicast-headers.patch b/target/linux/generic/hack-4.14/9501-flow_dissector-Parse-batman-adv-unicast-headers.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..58580ec7ae8f2dbd3783ae9988451a6d589efa5e
+--- /dev/null
++++ b/target/linux/generic/hack-4.14/9501-flow_dissector-Parse-batman-adv-unicast-headers.patch
+@@ -0,0 +1,115 @@
++From: Sven Eckelmann <sven.eckelmann@openmesh.com>
++Date: Thu, 21 Dec 2017 10:17:42 +0100
++Subject: [PATCH] flow_dissector: Parse batman-adv unicast headers
++
++The batman-adv unicast packets contain a full layer 2 frame in encapsulated
++form. The flow dissector must therefore be able to parse the batman-adv
++unicast header to reach the layer 2+3 information.
++
++  +--------------------+
++  | ip(v6)hdr          |
++  +--------------------+
++  | inner ethhdr       |
++  +--------------------+
++  | batadv unicast hdr |
++  +--------------------+
++  | outer ethhdr       |
++  +--------------------+
++
++The obtained information from the upper layer can then be used by RPS to
++schedule the processing on separate cores. This allows better distribution
++of multiple flows from the same neighbor to different cores.
++
++Signed-off-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
++Reviewed-by: Jiri Pirko <jiri@mellanox.com>
++Acked-by: Willem de Bruijn <willemb@google.com>
++Signed-off-by: David S. Miller <davem@davemloft.net>
++
++Origin: upstream, https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=5b0890a97204627d75a333fc30f29f737e2bfad6
++---
++ net/core/flow_dissector.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++
++ 1 file changed, 65 insertions(+)
++
++diff --git a/net/core/flow_dissector.c b/net/core/flow_dissector.c
++index d8796a7874b664cf41bc659b8988d64bd98f4976..8d26dc237cfe85abe268ced6312ff9c483b9e821 100644
++--- a/net/core/flow_dissector.c
+++++ b/net/core/flow_dissector.c
++@@ -338,6 +338,66 @@ __skb_flow_dissect_gre(const struct sk_buff *skb,
++ 	return FLOW_DISSECT_RET_PROTO_AGAIN;
++ }
++ 
+++/**
+++ * __skb_flow_dissect_batadv() - dissect batman-adv header
+++ * @skb: sk_buff to with the batman-adv header
+++ * @key_control: flow dissectors control key
+++ * @data: raw buffer pointer to the packet, if NULL use skb->data
+++ * @p_proto: pointer used to update the protocol to process next
+++ * @p_nhoff: pointer used to update inner network header offset
+++ * @hlen: packet header length
+++ * @flags: any combination of FLOW_DISSECTOR_F_*
+++ *
+++ * ETH_P_BATMAN packets are tried to be dissected. Only
+++ * &struct batadv_unicast packets are actually processed because they contain an
+++ * inner ethernet header and are usually followed by actual network header. This
+++ * allows the flow dissector to continue processing the packet.
+++ *
+++ * Return: FLOW_DISSECT_RET_PROTO_AGAIN when &struct batadv_unicast was found,
+++ *  FLOW_DISSECT_RET_OUT_GOOD when dissector should stop after encapsulation,
+++ *  otherwise FLOW_DISSECT_RET_OUT_BAD
+++ */
+++static enum flow_dissect_ret
+++__skb_flow_dissect_batadv(const struct sk_buff *skb,
+++			  struct flow_dissector_key_control *key_control,
+++			  void *data, __be16 *p_proto, int *p_nhoff, int hlen,
+++			  unsigned int flags)
+++{
+++	/* TODO provide struct in include/uapi/... header */
+++	struct batadv_unicast_packet {
+++		u8 packet_type;
+++		u8 version;
+++		u8 ttl;
+++		u8 ttvn;
+++		u8 dest[ETH_ALEN];
+++	};
+++
+++	struct {
+++		struct batadv_unicast_packet batadv_unicast;
+++		struct ethhdr eth;
+++	} *hdr, _hdr;
+++
+++	hdr = __skb_header_pointer(skb, *p_nhoff, sizeof(_hdr), data, hlen,
+++				   &_hdr);
+++	if (!hdr)
+++		return FLOW_DISSECT_RET_OUT_BAD;
+++
+++	if (hdr->batadv_unicast.version != 15)
+++		return FLOW_DISSECT_RET_OUT_BAD;
+++
+++	if (hdr->batadv_unicast.packet_type != 0x40)
+++		return FLOW_DISSECT_RET_OUT_BAD;
+++
+++	*p_proto = hdr->eth.h_proto;
+++	*p_nhoff += sizeof(*hdr);
+++
+++	key_control->flags |= FLOW_DIS_ENCAPSULATION;
+++	if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
+++		return FLOW_DISSECT_RET_OUT_GOOD;
+++
+++	return FLOW_DISSECT_RET_PROTO_AGAIN;
+++}
+++
++ static void
++ __skb_flow_dissect_tcp(const struct sk_buff *skb,
++ 		       struct flow_dissector *flow_dissector,
++@@ -717,6 +777,11 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
++ 					       nhoff, hlen);
++ 		break;
++ 
+++	case htons(ETH_P_BATMAN):
+++		fdret = __skb_flow_dissect_batadv(skb, key_control, data,
+++						  &proto, &nhoff, hlen, flags);
+++		break;
+++
++ 	default:
++ 		fdret = FLOW_DISSECT_RET_OUT_BAD;
++ 		break;
+diff --git a/target/linux/generic/hack-4.9/9501-flow_dissector-Parse-batman-adv-unicast-headers.patch b/target/linux/generic/hack-4.9/9501-flow_dissector-Parse-batman-adv-unicast-headers.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..80748de19a137788f9d8edda9ab13bf24104d8be
+--- /dev/null
++++ b/target/linux/generic/hack-4.9/9501-flow_dissector-Parse-batman-adv-unicast-headers.patch
+@@ -0,0 +1,59 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Mon, 27 Nov 2017 11:18:08 +0100
++Subject: [PATCH] flow_dissector: Parse batman-adv unicast headers
++
++The batman-adv unicast packets contain a full layer 2 frame in encapsulated
++form. The flow dissector must therefore be able to parse the batman-adv
++unicast header to reach the layer 2+3 information to allow RPS to schedule
++the flow to different cores.
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Origin: backport, https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=5b0890a97204627d75a333fc30f29f737e2bfad6
++---
++ net/core/flow_dissector.c | 32 ++++++++++++++++++++++++++++++++
++ 1 file changed, 32 insertions(+)
++
++diff --git a/net/core/flow_dissector.c b/net/core/flow_dissector.c
++index 55d44940435cfa4499f150ae6581f6f0b9b436dd..b628515df5afab61336c95c74a4266d969193cec 100644
++--- a/net/core/flow_dissector.c
+++++ b/net/core/flow_dissector.c
++@@ -243,6 +243,38 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
++ 
++ 		break;
++ 	}
+++	case htons(ETH_P_BATMAN): {
+++		/* TODO provide struct in include/uapi/... header */
+++		struct batadv_unicast_packet {
+++			u8 packet_type;
+++			u8 version;
+++			u8 ttl;
+++			u8 ttvn;
+++			u8 dest[ETH_ALEN];
+++		};
+++
+++		struct {
+++			struct batadv_unicast_packet batadv_unicast;
+++			struct ethhdr eth;
+++		} *hdr, _hdr;
+++
+++		hdr = __skb_header_pointer(skb, nhoff, sizeof(_hdr), data, hlen, &_hdr);
+++		if (!hdr)
+++			goto out_bad;
+++
+++		if (hdr->batadv_unicast.version != 15)
+++			break;
+++
+++		if (hdr->batadv_unicast.packet_type != 0x40)
+++			break;
+++
+++		/* TODO set batman-adv dest address? */
+++
+++		proto = hdr->eth.h_proto;
+++		nhoff += sizeof(*hdr);
+++
+++		goto again;
+++	}
++ 	case htons(ETH_P_8021AD):
++ 	case htons(ETH_P_8021Q): {
++ 		const struct vlan_hdr *vlan;
