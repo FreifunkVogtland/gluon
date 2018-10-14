@@ -1,0 +1,36 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Thu, 12 Apr 2018 11:11:35 +0200
+Subject: ath10k-firmware: Upgrade QCA988X firmware to 10.2.4-1.0-00041
+
+The QCA988X firmware now seems to have a stable branch called 10.2.4-1.0.
+It is assumed that upgrading this firmware will fix several problems. No
+details were given by QCA about the nature of the problems.
+
+One nice effect is that changing the beaconing rate is now possible.
+
+diff --git a/package/firmware/ath10k-firmware/Makefile b/package/firmware/ath10k-firmware/Makefile
+index e8cc4b91c3f59f09e4281c7b36048dc66bd04f3b..45fd225a5ce870aae414d9f253ce3f67b9de77bf 100644
+--- a/package/firmware/ath10k-firmware/Makefile
++++ b/package/firmware/ath10k-firmware/Makefile
+@@ -8,9 +8,9 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=ath10k-firmware
+-PKG_SOURCE_DATE:=2017-03-29
+-PKG_SOURCE_VERSION:=956e2609b7e42c8c710bba10ef925a5be1be5137
+-PKG_MIRROR_HASH:=25f724ff38c830281b3efba4a4ddffaae0c4bd8fea0f4c1061591229ff05535b
++PKG_SOURCE_DATE:=2018-07-25
++PKG_SOURCE_VERSION:=215326d4e9123d01a0c9afac1305b46bbfd057f0
++PKG_MIRROR_HASH:=11c6c9a233d58e13ab1376fffac5e2f5cfe5f9d547e5683207c85ede3d7d5583
+ PKG_RELEASE:=1
+ 
+ PKG_SOURCE_PROTO:=git
+@@ -261,7 +261,7 @@ define Package/ath10k-firmware-qca988x/install
+ 		$(PKG_BUILD_DIR)/QCA988X/hw2.0/board.bin \
+ 		$(1)/lib/firmware/ath10k/QCA988X/hw2.0/
+ 	$(INSTALL_DATA) \
+-		$(PKG_BUILD_DIR)/QCA988X/hw2.0/10.2.4-1.0/firmware-5.bin_10.2.4-1.0-00016 \
++		$(PKG_BUILD_DIR)/QCA988X/hw2.0/10.2.4-1.0/firmware-5.bin_10.2.4-1.0-00041 \
+ 		$(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-5.bin
+ endef
+ 

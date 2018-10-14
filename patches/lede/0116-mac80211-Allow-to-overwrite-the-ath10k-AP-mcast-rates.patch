@@ -1,0 +1,731 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Fri, 16 Feb 2018 13:53:32 +0100
+Subject: mac80211: Allow to overwrite the ath10k AP mcast rates
+
+Forwarded: no
+ Needs to be cleaned up to actually work with mac80211
+
+diff --git a/package/kernel/ath10k-ct/patches/9593-ath10k-Allow-to-configure-bcast-mcast-rate.patch b/package/kernel/ath10k-ct/patches/9593-ath10k-Allow-to-configure-bcast-mcast-rate.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..68c302f27f7a84b25585309fa73d78baf268542e
+--- /dev/null
++++ b/package/kernel/ath10k-ct/patches/9593-ath10k-Allow-to-configure-bcast-mcast-rate.patch
+@@ -0,0 +1,364 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Fri, 16 Feb 2018 13:49:51 +0100
++Subject: [PATCH] ath10k: Allow to configure bcast/mcast rate
++
++TODO:
++
++ * find better way to get mcast_rate
++ * better get the lowest configured basic rate for APs
++ * remove netifd WAR
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Forwarded: no
++ not yet in the correct shape
++---
++ ath10k/core.h  |   1 +
++ ath10k/debug.c |  78 ++++++++++++++++++++++
++ ath10k/debug.h |  11 ++++
++ ath10k/mac.c   | 113 ++++++++++++++++++++++++++++++++
++ ath10k/mac.h   |   1 +
++ 5 files changed, 204 insertions(+)
++
++--- a/ath10k/core.h
+++++ b/ath10k/core.h
++@@ -434,6 +434,8 @@ struct ath10k_vif {
++ 	bool nohwcrypt; /* actual setting, based on firmware abilities, etc. */
++ 	int num_legacy_stations;
++ 	int txpower;
+++	u16 mcast_rate;
+++#if 0
++ 	/* Firmware allows configuring rate of each of these traffic types.
++ 	 * 0xFF will mean value has not been set by user, and in that case,
++ 	 * we will auto-adjust the rates based on the legacy rate mask.
++@@ -441,6 +443,7 @@ struct ath10k_vif {
++ 	u8 mcast_rate[NUM_NL80211_BANDS];
++ 	u8 bcast_rate[NUM_NL80211_BANDS];
++ 	u8 mgt_rate[NUM_NL80211_BANDS];
+++#endif
++ 	struct wmi_wmm_params_all_arg wmm_params;
++ 	struct work_struct ap_csa_work;
++ 	struct delayed_work connection_loss_work;
++--- a/ath10k/debug.c
+++++ b/ath10k/debug.c
++@@ -23,6 +23,7 @@
++ #include <linux/firmware.h>
++ 
++ #include "core.h"
+++#include "mac.h"
++ #include "debug.h"
++ #include "hif.h"
++ #include "wmi-ops.h"
++@@ -1222,12 +1223,14 @@ static ssize_t ath10k_write_set_rates(st
++ 	}
++ 
++ 	/* Store the value so we can re-apply it if firmware is restarted. */
+++#if 0
++ 	if (set_rate_type == ar->wmi.vdev_param->mgmt_rate)
++ 		arvif->mgt_rate[cfg_band] = rc;
++ 	else if (set_rate_type == ar->wmi.vdev_param->bcast_data_rate)
++ 		arvif->bcast_rate[cfg_band] = rc;
++ 	else if (set_rate_type == ar->wmi.vdev_param->mcast_data_rate)
++ 		arvif->mcast_rate[cfg_band] = rc;
+++#endif
++ 
++ 	if (ar->state != ATH10K_STATE_ON &&
++ 	    ar->state != ATH10K_STATE_RESTARTED) {
++@@ -3447,6 +3450,81 @@ void ath10k_debug_unregister(struct ath1
++ 	cancel_delayed_work_sync(&ar->debug.htt_stats_dwork);
++ }
++ 
+++static ssize_t ath10k_write_mcast_rate(struct file *file,
+++				       const char __user *ubuf,
+++				       size_t count, loff_t *ppos)
+++{
+++	struct ath10k_vif *arvif = file->private_data;
+++	struct ath10k *ar = arvif->ar;
+++	ssize_t ret = 0;
+++	u32 mcast_rate;
+++
+++	ret = kstrtou32_from_user(ubuf, count, 0, &mcast_rate);
+++	if (ret)
+++		return ret;
+++
+++	mutex_lock(&ar->conf_mutex);
+++
+++	arvif->mcast_rate = mcast_rate;
+++	ret = ath10k_mac_set_mcast_rate(arvif);
+++	if (ret)
+++		goto unlock;
+++
+++	ret = count;
+++unlock:
+++	mutex_unlock(&ar->conf_mutex);
+++
+++	return ret;
+++}
+++
+++static ssize_t ath10k_read_mcast_rate(struct file *file, char __user *ubuf,
+++				      size_t count, loff_t *ppos)
+++
+++{
+++	struct ath10k_vif *arvif = file->private_data;
+++	struct ath10k *ar = arvif->ar;
+++	char buf[32];
+++	int len = 0;
+++	u16 mcast_rate;
+++
+++	mutex_lock(&ar->conf_mutex);
+++	mcast_rate = arvif->mcast_rate;
+++	mutex_unlock(&ar->conf_mutex);
+++
+++	len = scnprintf(buf, sizeof(buf) - len, "%u\n", mcast_rate);
+++
+++	return simple_read_from_buffer(ubuf, count, ppos, buf, len);
+++}
+++
+++static const struct file_operations fops_mcast_rate = {
+++	.read = ath10k_read_mcast_rate,
+++	.write = ath10k_write_mcast_rate,
+++	.open = simple_open
+++};
+++
+++int ath10k_debug_register_netdev(struct ath10k_vif *arvif)
+++{
+++	struct dentry *debugfs_netdev;
+++
+++	debugfs_netdev = debugfs_create_dir("ath10k", arvif->vif->debugfs_dir);
+++	if (IS_ERR_OR_NULL(debugfs_netdev)) {
+++		if (IS_ERR(debugfs_netdev))
+++			return PTR_ERR(debugfs_netdev);
+++
+++		return -ENOMEM;
+++	}
+++
+++	debugfs_create_file("mcast_rate", S_IRUGO | S_IWUSR,
+++			    debugfs_netdev, arvif,
+++			    &fops_mcast_rate);
+++
+++	return 0;
+++}
+++
+++void ath10k_debug_unregister_netdev(struct ath10k_vif *arvif)
+++{
+++}
+++
++ #endif /* CONFIG_ATH10K_DEBUGFS */
++ 
++ #ifdef CONFIG_ATH10K_DEBUG
++--- a/ath10k/debug.h
+++++ b/ath10k/debug.h
++@@ -85,6 +85,8 @@ int ath10k_debug_create(struct ath10k *a
++ void ath10k_debug_destroy(struct ath10k *ar);
++ int ath10k_debug_register(struct ath10k *ar);
++ void ath10k_debug_unregister(struct ath10k *ar);
+++int ath10k_debug_register_netdev(struct ath10k_vif *arvif);
+++void ath10k_debug_unregister_netdev(struct ath10k_vif *arvif);
++ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb);
++ void ath10k_debug_tpc_stats_process(struct ath10k *ar,
++ 				    struct ath10k_tpc_stats *tpc_stats);
++@@ -136,6 +138,15 @@ static inline void ath10k_debug_unregist
++ {
++ }
++ 
+++static inline int ath10k_debug_register_netdev(struct ath10k_vif *arvif)
+++{
+++	return 0;
+++}
+++
+++static inline void ath10k_debug_unregister_netdev(struct ath10k_vif *arvif)
+++{
+++}
+++
++ static inline void ath10k_debug_fw_stats_process(struct ath10k *ar,
++ 						 struct sk_buff *skb)
++ {
++--- a/ath10k/mac.c
+++++ b/ath10k/mac.c
++@@ -124,6 +124,101 @@ u8 ath10k_mac_bitrate_to_idx(const struc
++ 	return 0;
++ }
++ 
+++int ath10k_mac_set_mcast_rate(struct ath10k_vif *arvif)
+++{
+++	const struct ieee80211_supported_band *sband;
+++	struct ath10k *ar = arvif->ar;
+++	struct cfg80211_chan_def def;
+++	enum nl80211_band band;
+++	u16 best_bitrate = 0;
+++	u16 hw_value;
+++	u32 ratemask;
+++	u8 rate_code;
+++	u8 preamble;
+++	int i;
+++	int ret;
+++
+++	lockdep_assert_held(&ar->conf_mutex);
+++
+++	if (ath10k_mac_vif_chan(arvif->vif, &def))
+++		return -EPERM;
+++
+++	band = def.chan->band;
+++	sband = ar->hw->wiphy->bands[band];
+++	ratemask = arvif->bitrate_mask.control[band].legacy;
+++
+++	/* it seems that arvif is lost on every fw crash
+++	 * read the lowest mcast read of bss
+++	 */
+++	if (!arvif->mcast_rate && arvif->vif->bss_conf.mcast_rate[band])
+++		arvif->mcast_rate = sband->bitrates[arvif->vif->bss_conf.mcast_rate[band] - 1].bitrate;
+++
+++	for (i = 0; i < sband->n_bitrates; i++) {
+++		if (!(ratemask & BIT(i)))
+++			continue;
+++
+++		if (best_bitrate &&
+++		    arvif->mcast_rate != sband->bitrates[i].bitrate)
+++			continue;
+++
+++		best_bitrate = sband->bitrates[i].bitrate;
+++		hw_value = sband->bitrates[i].hw_value;
+++
+++		if (ath10k_mac_bitrate_is_cck(sband->bitrates[i].bitrate)) {
+++			preamble = WMI_RATE_PREAMBLE_CCK;
+++
+++			/* QCA didn't use the correct rate values for CA99x0
+++			 * and above (ath10k_g_rates_rev2)
+++			 */
+++			switch (sband->bitrates[i].bitrate) {
+++			case 10:
+++				hw_value = ATH10K_HW_RATE_CCK_LP_1M;
+++				break;
+++			case 20:
+++				hw_value = ATH10K_HW_RATE_CCK_LP_2M;
+++				break;
+++			case 55:
+++				hw_value = ATH10K_HW_RATE_CCK_LP_5_5M;
+++				break;
+++			case 110:
+++				hw_value = ATH10K_HW_RATE_CCK_LP_11M;
+++				break;
+++			}
+++		} else {
+++			preamble = WMI_RATE_PREAMBLE_OFDM;
+++		}
+++
+++		rate_code = ATH10K_HW_RATECODE(hw_value, 0, preamble);
+++	}
+++
+++	if (!best_bitrate) {
+++		ath10k_warn(ar, "failed to select multicast rate\n");
+++		return -EINVAL;
+++	}
+++
+++	arvif->mcast_rate = best_bitrate;
+++
+++	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
+++					ar->wmi.vdev_param->mgmt_rate,
+++					rate_code);
+++	if (ret)
+++		ath10k_warn(ar, "failed to set mgmt fixed rate: %d\n",ret);
+++
+++	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
+++					ar->wmi.vdev_param->bcast_data_rate,
+++					rate_code);
+++	if (ret)
+++		ath10k_warn(ar, "failed to set bcast fixed rate: %d\n",ret);
+++
+++	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
+++					ar->wmi.vdev_param->mcast_data_rate,
+++					rate_code);
+++	if (ret)
+++		ath10k_warn(ar, "failed to set mcast fixed rate: %d\n",ret);
+++
+++	return 0;
+++}
+++
++ static int ath10k_mac_get_max_vht_mcs_map(u16 mcs_map, int nss)
++ {
++ 	switch ((mcs_map >> (2 * nss)) & 0x3) {
++@@ -3224,7 +3319,7 @@ static void ath10k_check_apply_special_r
++ 	   5Ghz or p2p mode: 6Mbps mgt, bcast, mcast
++ 	   2.4Ghz: 1Mbps for mgt, 11Mbps for bcast, mcast
++ 	*/
++-
+++#if 0
++ 	/* Check for user-specified rates. */
++ 	if (arvif->mcast_rate[band] != WMI_FIXED_RATE_NONE)
++ 		mcast_rt = arvif->mcast_rate[band];
++@@ -3323,6 +3418,7 @@ found_preferred24:
++ 			ath10k_warn(ar, "failed to set mgt rate param 0x%02x: %d\n",
++ 				    mgt_rt, ret);
++ 	}
+++#endif
++ }
++ 
++ static int ath10k_station_assoc(struct ath10k *ar,
++@@ -5325,9 +5421,11 @@ static int ath10k_add_interface(struct i
++ 	memset(arvif, 0, sizeof(*arvif));
++ 	ath10k_mac_txq_init(ar, vif->txq);
++ 
+++#if 0
++ 	memset(&arvif->bcast_rate, WMI_FIXED_RATE_NONE, sizeof(arvif->bcast_rate));
++ 	memset(&arvif->mcast_rate, WMI_FIXED_RATE_NONE, sizeof(arvif->mcast_rate));
++ 	memset(&arvif->mgt_rate, WMI_FIXED_RATE_NONE, sizeof(arvif->mgt_rate));
+++#endif
++ 
++ 	arvif->ar = ar;
++ 	arvif->vif = vif;
++@@ -5615,6 +5713,9 @@ static int ath10k_add_interface(struct i
++ 	spin_unlock_bh(&ar->htt.tx_lock);
++ 
++ 	mutex_unlock(&ar->conf_mutex);
+++
+++	ath10k_debug_register_netdev(arvif);
+++
++ 	return 0;
++ 
++ err_peer_delete:
++@@ -5661,6 +5762,8 @@ static void ath10k_remove_interface(stru
++ 	cancel_work_sync(&arvif->ap_csa_work);
++ 	cancel_delayed_work_sync(&arvif->connection_loss_work);
++ 
+++	ath10k_debug_unregister_netdev(arvif);
+++
++ 	mutex_lock(&ar->conf_mutex);
++ 
++ 	spin_lock_bh(&ar->data_lock);
++@@ -5957,6 +6060,12 @@ static void ath10k_bss_info_changed(stru
++ 				    arvif->vdev_id, ret);
++ 	}
++ 
+++	/* TODO when should we actually call that */
+++	ret = ath10k_mac_set_mcast_rate(arvif);
+++	if (ret)
+++		ath10k_warn(ar, "failed to set multicast rate params on vdev %i: %d\n",
+++			    arvif->vdev_id, ret);
+++
++ 	mutex_unlock(&ar->conf_mutex);
++ }
++ 
++@@ -7572,6 +7681,13 @@ static int ath10k_mac_op_set_bitrate_mas
++ 	 */
++ 	ath10k_check_apply_special_rates(ar, arvif);
++ 
+++	ret = ath10k_mac_set_mcast_rate(arvif);
+++	if (ret) {
+++		ath10k_warn(ar, "failed to set multicast rate params on vdev %i: %d\n",
+++			    arvif->vdev_id, ret);
+++		goto exit;
+++	}
+++
++ exit:
++ 	mutex_unlock(&ar->conf_mutex);
++ 
++--- a/ath10k/mac.h
+++++ b/ath10k/mac.h
++@@ -75,6 +75,7 @@ u8 ath10k_mac_hw_rate_to_idx(const struc
++ 			     u8 hw_rate, bool cck);
++ u8 ath10k_mac_bitrate_to_idx(const struct ieee80211_supported_band *sband,
++ 			     u32 bitrate);
+++int ath10k_mac_set_mcast_rate(struct ath10k_vif *arvif);
++ 
++ void ath10k_mac_tx_lock(struct ath10k *ar, int reason);
++ void ath10k_mac_tx_unlock(struct ath10k *ar, int reason);
+diff --git a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+index e194ae8befdb4003f1eb32b44ed0ecb56567f5c5..19ff64de150312b5d040bd136629444e0cee25fb 100644
+--- a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
++++ b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+@@ -516,6 +516,21 @@ mac80211_prepare_vif() {
+ 	json_select ..
+ }
+ 
++mac80211_set_mcast_rate() {
++	json_select config
++	json_get_vars mcast_rate
++	json_select ..
++
++	json_select data
++	json_get_vars ifname
++	json_select ..
++
++	if [ -n "$mcast_rate" -a -n "$ifname" ]; then
++		echo $(($mcast_rate / 100)) > /sys/kernel/debug/ieee80211/$phy/netdev:$ifname/ath10k/mcast_rate
++	fi
++
++}
++
+ mac80211_setup_supplicant() {
+ 	wpa_supplicant_prepare_interface "$ifname" nl80211 || return 1
+ 	wpa_supplicant_add_network "$ifname"
+@@ -805,6 +820,8 @@ drv_mac80211_setup() {
+ 		}
+ 	}
+ 
++	for_each_interface "ap" mac80211_set_mcast_rate
++
+ 	for_each_interface "ap sta adhoc mesh monitor" mac80211_setup_vif
+ 
+ 	wireless_set_up
+diff --git a/package/kernel/mac80211/patches/9593-ath10k-Allow-to-configure-bcast-mcast-rate.patch b/package/kernel/mac80211/patches/9593-ath10k-Allow-to-configure-bcast-mcast-rate.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..11ab305752b215346c853f4fb8d8b484aff018e7
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9593-ath10k-Allow-to-configure-bcast-mcast-rate.patch
+@@ -0,0 +1,313 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Fri, 16 Feb 2018 13:49:51 +0100
++Subject: [PATCH] ath10k: Allow to configure bcast/mcast rate
++
++TODO:
++
++ * find better way to get mcast_rate
++ * better get the lowest configured basic rate for APs
++ * remove netifd WAR
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Forwarded: no
++ not yet in the correct shape
++---
++ drivers/net/wireless/ath/ath10k/core.h  |   1 +
++ drivers/net/wireless/ath/ath10k/debug.c |  78 ++++++++++++++++++++++
++ drivers/net/wireless/ath/ath10k/debug.h |  11 ++++
++ drivers/net/wireless/ath/ath10k/mac.c   | 113 ++++++++++++++++++++++++++++++++
++ drivers/net/wireless/ath/ath10k/mac.h   |   1 +
++ 5 files changed, 204 insertions(+)
++
++--- a/drivers/net/wireless/ath/ath10k/core.h
+++++ b/drivers/net/wireless/ath/ath10k/core.h
++@@ -426,6 +426,7 @@ struct ath10k_vif {
++ 	bool nohwcrypt;
++ 	int num_legacy_stations;
++ 	int txpower;
+++	u16 mcast_rate;
++ 	struct wmi_wmm_params_all_arg wmm_params;
++ 	struct work_struct ap_csa_work;
++ 	struct delayed_work connection_loss_work;
++--- a/drivers/net/wireless/ath/ath10k/debug.c
+++++ b/drivers/net/wireless/ath/ath10k/debug.c
++@@ -24,6 +24,7 @@
++ #include <linux/devcoredump.h>
++ 
++ #include "core.h"
+++#include "mac.h"
++ #include "debug.h"
++ #include "hif.h"
++ #include "wmi-ops.h"
++@@ -2527,6 +2528,83 @@ void ath10k_debug_unregister(struct ath1
++ 	cancel_delayed_work_sync(&ar->debug.htt_stats_dwork);
++ }
++ 
+++
+++
+++static ssize_t ath10k_write_mcast_rate(struct file *file,
+++				       const char __user *ubuf,
+++				       size_t count, loff_t *ppos)
+++{
+++	struct ath10k_vif *arvif = file->private_data;
+++	struct ath10k *ar = arvif->ar;
+++	ssize_t ret = 0;
+++	u32 mcast_rate;
+++
+++	ret = kstrtou32_from_user(ubuf, count, 0, &mcast_rate);
+++	if (ret)
+++		return ret;
+++
+++	mutex_lock(&ar->conf_mutex);
+++
+++	arvif->mcast_rate = mcast_rate;
+++	ret = ath10k_mac_set_mcast_rate(arvif);
+++	if (ret)
+++		goto unlock;
+++
+++	ret = count;
+++unlock:
+++	mutex_unlock(&ar->conf_mutex);
+++
+++	return ret;
+++}
+++
+++static ssize_t ath10k_read_mcast_rate(struct file *file, char __user *ubuf,
+++				      size_t count, loff_t *ppos)
+++
+++{
+++	struct ath10k_vif *arvif = file->private_data;
+++	struct ath10k *ar = arvif->ar;
+++	char buf[32];
+++	int len = 0;
+++	u16 mcast_rate;
+++
+++	mutex_lock(&ar->conf_mutex);
+++	mcast_rate = arvif->mcast_rate;
+++	mutex_unlock(&ar->conf_mutex);
+++
+++	len = scnprintf(buf, sizeof(buf) - len, "%u\n", mcast_rate);
+++
+++	return simple_read_from_buffer(ubuf, count, ppos, buf, len);
+++}
+++
+++static const struct file_operations fops_mcast_rate = {
+++	.read = ath10k_read_mcast_rate,
+++	.write = ath10k_write_mcast_rate,
+++	.open = simple_open
+++};
+++
+++int ath10k_debug_register_netdev(struct ath10k_vif *arvif)
+++{
+++	struct dentry *debugfs_netdev;
+++
+++	debugfs_netdev = debugfs_create_dir("ath10k", arvif->vif->debugfs_dir);
+++	if (IS_ERR_OR_NULL(debugfs_netdev)) {
+++		if (IS_ERR(debugfs_netdev))
+++			return PTR_ERR(debugfs_netdev);
+++
+++		return -ENOMEM;
+++	}
+++
+++	debugfs_create_file("mcast_rate", S_IRUGO | S_IWUSR,
+++			    debugfs_netdev, arvif,
+++			    &fops_mcast_rate);
+++
+++	return 0;
+++}
+++
+++void ath10k_debug_unregister_netdev(struct ath10k_vif *arvif)
+++{
+++}
+++
++ #endif /* CPTCFG_ATH10K_DEBUGFS */
++ 
++ #ifdef CPTCFG_ATH10K_DEBUG
++--- a/drivers/net/wireless/ath/ath10k/debug.h
+++++ b/drivers/net/wireless/ath/ath10k/debug.h
++@@ -77,6 +77,8 @@ int ath10k_debug_create(struct ath10k *a
++ void ath10k_debug_destroy(struct ath10k *ar);
++ int ath10k_debug_register(struct ath10k *ar);
++ void ath10k_debug_unregister(struct ath10k *ar);
+++int ath10k_debug_register_netdev(struct ath10k_vif *arvif);
+++void ath10k_debug_unregister_netdev(struct ath10k_vif *arvif);
++ void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb);
++ void ath10k_debug_tpc_stats_process(struct ath10k *ar,
++ 				    struct ath10k_tpc_stats *tpc_stats);
++@@ -137,6 +139,15 @@ static inline void ath10k_debug_unregist
++ {
++ }
++ 
+++static inline int ath10k_debug_register_netdev(struct ath10k_vif *arvif)
+++{
+++	return 0;
+++}
+++
+++static inline void ath10k_debug_unregister_netdev(struct ath10k_vif *arvif)
+++{
+++}
+++
++ static inline void ath10k_debug_fw_stats_process(struct ath10k *ar,
++ 						 struct sk_buff *skb)
++ {
++--- a/drivers/net/wireless/ath/ath10k/mac.c
+++++ b/drivers/net/wireless/ath/ath10k/mac.c
++@@ -153,6 +153,101 @@ u8 ath10k_mac_bitrate_to_idx(const struc
++ 	return 0;
++ }
++ 
+++int ath10k_mac_set_mcast_rate(struct ath10k_vif *arvif)
+++{
+++	const struct ieee80211_supported_band *sband;
+++	struct ath10k *ar = arvif->ar;
+++	struct cfg80211_chan_def def;
+++	enum nl80211_band band;
+++	u16 best_bitrate = 0;
+++	u16 hw_value;
+++	u32 ratemask;
+++	u8 rate_code;
+++	u8 preamble;
+++	int i;
+++	int ret;
+++
+++	lockdep_assert_held(&ar->conf_mutex);
+++
+++	if (ath10k_mac_vif_chan(arvif->vif, &def))
+++		return -EPERM;
+++
+++	band = def.chan->band;
+++	sband = ar->hw->wiphy->bands[band];
+++	ratemask = arvif->bitrate_mask.control[band].legacy;
+++
+++	/* it seems that arvif is lost on every fw crash
+++	 * read the lowest mcast read of bss
+++	 */
+++	if (!arvif->mcast_rate && arvif->vif->bss_conf.mcast_rate[band])
+++		arvif->mcast_rate = sband->bitrates[arvif->vif->bss_conf.mcast_rate[band] - 1].bitrate;
+++
+++	for (i = 0; i < sband->n_bitrates; i++) {
+++		if (!(ratemask & BIT(i)))
+++			continue;
+++
+++		if (best_bitrate &&
+++		    arvif->mcast_rate != sband->bitrates[i].bitrate)
+++			continue;
+++
+++		best_bitrate = sband->bitrates[i].bitrate;
+++		hw_value = sband->bitrates[i].hw_value;
+++
+++		if (ath10k_mac_bitrate_is_cck(sband->bitrates[i].bitrate)) {
+++			preamble = WMI_RATE_PREAMBLE_CCK;
+++
+++			/* QCA didn't use the correct rate values for CA99x0
+++			 * and above (ath10k_g_rates_rev2)
+++			 */
+++			switch (sband->bitrates[i].bitrate) {
+++			case 10:
+++				hw_value = ATH10K_HW_RATE_CCK_LP_1M;
+++				break;
+++			case 20:
+++				hw_value = ATH10K_HW_RATE_CCK_LP_2M;
+++				break;
+++			case 55:
+++				hw_value = ATH10K_HW_RATE_CCK_LP_5_5M;
+++				break;
+++			case 110:
+++				hw_value = ATH10K_HW_RATE_CCK_LP_11M;
+++				break;
+++			}
+++		} else {
+++			preamble = WMI_RATE_PREAMBLE_OFDM;
+++		}
+++
+++		rate_code = ATH10K_HW_RATECODE(hw_value, 0, preamble);
+++	}
+++
+++	if (!best_bitrate) {
+++		ath10k_warn(ar, "failed to select multicast rate\n");
+++		return -EINVAL;
+++	}
+++
+++	arvif->mcast_rate = best_bitrate;
+++
+++	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
+++					ar->wmi.vdev_param->mgmt_rate,
+++					rate_code);
+++	if (ret)
+++		ath10k_warn(ar, "failed to set mgmt fixed rate: %d\n",ret);
+++
+++	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
+++					ar->wmi.vdev_param->bcast_data_rate,
+++					rate_code);
+++	if (ret)
+++		ath10k_warn(ar, "failed to set bcast fixed rate: %d\n",ret);
+++
+++	ret = ath10k_wmi_vdev_set_param(ar, arvif->vdev_id,
+++					ar->wmi.vdev_param->mcast_data_rate,
+++					rate_code);
+++	if (ret)
+++		ath10k_warn(ar, "failed to set mcast fixed rate: %d\n",ret);
+++
+++	return 0;
+++}
+++
++ static int ath10k_mac_get_max_vht_mcs_map(u16 mcs_map, int nss)
++ {
++ 	switch ((mcs_map >> (2 * nss)) & 0x3) {
++@@ -5147,6 +5242,9 @@ static int ath10k_add_interface(struct i
++ 	spin_unlock_bh(&ar->htt.tx_lock);
++ 
++ 	mutex_unlock(&ar->conf_mutex);
+++
+++	ath10k_debug_register_netdev(arvif);
+++
++ 	return 0;
++ 
++ err_peer_delete:
++@@ -5193,6 +5291,8 @@ static void ath10k_remove_interface(stru
++ 	cancel_work_sync(&arvif->ap_csa_work);
++ 	cancel_delayed_work_sync(&arvif->connection_loss_work);
++ 
+++	ath10k_debug_unregister_netdev(arvif);
+++
++ 	mutex_lock(&ar->conf_mutex);
++ 
++ 	spin_lock_bh(&ar->data_lock);
++@@ -5490,6 +5590,12 @@ static void ath10k_bss_info_changed(stru
++ 				    arvif->vdev_id, ret);
++ 	}
++ 
+++	/* TODO when should we actually call that */
+++	ret = ath10k_mac_set_mcast_rate(arvif);
+++	if (ret)
+++		ath10k_warn(ar, "failed to set multicast rate params on vdev %i: %d\n",
+++			    arvif->vdev_id, ret);
+++
++ 	mutex_unlock(&ar->conf_mutex);
++ }
++ 
++@@ -6973,6 +7079,13 @@ static int ath10k_mac_op_set_bitrate_mas
++ 			    arvif->vdev_id, ret);
++ 		goto exit;
++ 	}
+++
+++	ret = ath10k_mac_set_mcast_rate(arvif);
+++	if (ret) {
+++		ath10k_warn(ar, "failed to set multicast rate params on vdev %i: %d\n",
+++			    arvif->vdev_id, ret);
+++		goto exit;
+++	}
++ 
++ exit:
++ 	mutex_unlock(&ar->conf_mutex);
++--- a/drivers/net/wireless/ath/ath10k/mac.h
+++++ b/drivers/net/wireless/ath/ath10k/mac.h
++@@ -69,6 +69,7 @@ u8 ath10k_mac_hw_rate_to_idx(const struc
++ 			     u8 hw_rate, bool cck);
++ u8 ath10k_mac_bitrate_to_idx(const struct ieee80211_supported_band *sband,
++ 			     u32 bitrate);
+++int ath10k_mac_set_mcast_rate(struct ath10k_vif *arvif);
++ 
++ void ath10k_mac_tx_lock(struct ath10k *ar, int reason);
++ void ath10k_mac_tx_unlock(struct ath10k *ar, int reason);
