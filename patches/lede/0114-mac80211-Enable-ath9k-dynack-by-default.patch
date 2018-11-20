@@ -7,7 +7,7 @@ Signed-off-by: Sven Eckelmann <sven@narfation.org>
 Forwarded: no
 
 diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
-index 373fadd33f2087321669afc7386d52fbec721c26..4fe7aa57a59a0f647777be19d8ab3b6e839992e2 100644
+index 3f1c29bf9cc9ff60c2978279dd7992c359de7bc1..77d430e070c27e310bad102c0765e00a063b9f56 100644
 --- a/package/kernel/mac80211/Makefile
 +++ b/package/kernel/mac80211/Makefile
 @@ -192,6 +192,7 @@ define KernelPackage/ath/config

@@ -68,7 +68,7 @@ Signed-off-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
 Origin: backport, https://git.openwrt.org/?p=openwrt/openwrt.git;a=commit;h=8b42a260ed8ff6809cd0ade20a5c1fa003feb6d0
 
 diff --git a/package/kernel/mac80211/Makefile b/package/kernel/mac80211/Makefile
-index 0cdce6386db78cb72883d32bd6c00ccba1325083..373fadd33f2087321669afc7386d52fbec721c26 100644
+index d65038ccc0e5cb7028f7d10e747adfd3ae33ee08..3f1c29bf9cc9ff60c2978279dd7992c359de7bc1 100644
 --- a/package/kernel/mac80211/Makefile
 +++ b/package/kernel/mac80211/Makefile
 @@ -56,6 +56,7 @@ PKG_CONFIG_DEPENDS:= \
