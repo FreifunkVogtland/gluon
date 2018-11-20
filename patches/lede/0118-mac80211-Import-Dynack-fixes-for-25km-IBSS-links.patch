@@ -1,0 +1,394 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 20 Nov 2018 21:49:10 +0100
+Subject: mac80211: Import Dynack fixes for 25km IBSS links
+
+Add properly support for dynack in ibss mode. Moreover
+allow acktimeout ewma estimation to converge faster
+to the correct value during 'late ack' phase.
+This series has been tested on devices mounted on offshore
+high-voltage stations connected through ~24Km link
+
+Forwarded: no
+
+diff --git a/package/kernel/mac80211/patches/9601-ath9k-dynack-use-authentication-messages-for-late-ac.patch b/package/kernel/mac80211/patches/9601-ath9k-dynack-use-authentication-messages-for-late-ac.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..0bfc9eb2089f29fe549db5f4a7247f8e45291c40
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9601-ath9k-dynack-use-authentication-messages-for-late-ac.patch
+@@ -0,0 +1,34 @@
++From: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Date: Fri, 2 Nov 2018 21:49:55 +0100
++Subject: [PATCH] ath9k: dynack: use authentication messages for 'late' ack
++
++In order to properly support dynack in ad-hoc mode running
++wpa_supplicant, take into account authentication frames for
++'late ack' detection. This patch has been tested on devices
++mounted on offshore high-voltage stations connected through
++~24Km link
++
++Reported-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
++Tested-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
++Signed-off-by: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
++
++Origin: upstream, https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=3831a2a0010c72e3956020cbf1057a1701a2e469
++---
++ drivers/net/wireless/ath/ath9k/dynack.c | 3 ++-
++ 1 file changed, 2 insertions(+), 1 deletion(-)
++
++diff --git a/drivers/net/wireless/ath/ath9k/dynack.c b/drivers/net/wireless/ath/ath9k/dynack.c
++index 7334c9b09e82ce7aedd0f15c09d0f113537b8cf9..cc0dc966c512c92dbaff47c2406cd3a5fe1e2211 100644
++--- a/drivers/net/wireless/ath/ath9k/dynack.c
+++++ b/drivers/net/wireless/ath/ath9k/dynack.c
++@@ -187,7 +187,8 @@ void ath_dynack_sample_tx_ts(struct ath_hw *ah, struct sk_buff *skb,
++ 	/* late ACK */
++ 	if (ts->ts_status & ATH9K_TXERR_XRETRY) {
++ 		if (ieee80211_is_assoc_req(hdr->frame_control) ||
++-		    ieee80211_is_assoc_resp(hdr->frame_control)) {
+++		    ieee80211_is_assoc_resp(hdr->frame_control) ||
+++		    ieee80211_is_auth(hdr->frame_control)) {
++ 			ath_dbg(common, DYNACK, "late ack\n");
++ 			ath9k_hw_setslottime(ah, (LATEACK_TO - 3) / 2);
++ 			ath9k_hw_set_ack_timeout(ah, LATEACK_TO);
+diff --git a/package/kernel/mac80211/patches/9602-ath9k-dynack-move-debug-log-after-buffer-increments.patch b/package/kernel/mac80211/patches/9602-ath9k-dynack-move-debug-log-after-buffer-increments.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..93a7b793a58fc1e0757f3d91b28354a5f3150c31
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9602-ath9k-dynack-move-debug-log-after-buffer-increments.patch
+@@ -0,0 +1,95 @@
++From: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Date: Fri, 2 Nov 2018 21:49:56 +0100
++Subject: [PATCH] ath9k: dynack: move debug log after buffer increments
++
++Move debug log in ath_dynack_sample_tx_ts and ath_dynack_sample_ack_ts
++after timestamp buffer head/tail increments in order to make debugging
++more user friendly
++
++Tested-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
++Signed-off-by: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
++
++Origin: upstream, https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=5e3d4718b1574c8634b45965307dee20a6c921a1
++---
++ drivers/net/wireless/ath/ath9k/dynack.c | 26 ++++++++++++-------------
++ 1 file changed, 12 insertions(+), 14 deletions(-)
++
++diff --git a/drivers/net/wireless/ath/ath9k/dynack.c b/drivers/net/wireless/ath/ath9k/dynack.c
++index cc0dc966c512c92dbaff47c2406cd3a5fe1e2211..5c969d833825f84875b0aefea934c8bb4f9a0011 100644
++--- a/drivers/net/wireless/ath/ath9k/dynack.c
+++++ b/drivers/net/wireless/ath/ath9k/dynack.c
++@@ -171,11 +171,12 @@ static void ath_dynack_compute_to(struct ath_hw *ah)
++ void ath_dynack_sample_tx_ts(struct ath_hw *ah, struct sk_buff *skb,
++ 			     struct ath_tx_status *ts)
++ {
++-	u8 ridx;
++ 	struct ieee80211_hdr *hdr;
++ 	struct ath_dynack *da = &ah->dynack;
++ 	struct ath_common *common = ath9k_hw_common(ah);
++ 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+++	u32 dur = ts->duration;
+++	u8 ridx;
++ 
++ 	if ((info->flags & IEEE80211_TX_CTL_NO_ACK) || !da->enabled)
++ 		return;
++@@ -203,14 +204,13 @@ void ath_dynack_sample_tx_ts(struct ath_hw *ah, struct sk_buff *skb,
++ 	ridx = ts->ts_rateindex;
++ 
++ 	da->st_rbf.ts[da->st_rbf.t_rb].tstamp = ts->ts_tstamp;
++-	da->st_rbf.ts[da->st_rbf.t_rb].dur = ts->duration;
++ 	ether_addr_copy(da->st_rbf.addr[da->st_rbf.t_rb].h_dest, hdr->addr1);
++ 	ether_addr_copy(da->st_rbf.addr[da->st_rbf.t_rb].h_src, hdr->addr2);
++ 
++ 	if (!(info->status.rates[ridx].flags & IEEE80211_TX_RC_MCS)) {
++-		u32 phy, sifs;
++ 		const struct ieee80211_rate *rate;
++ 		struct ieee80211_tx_rate *rates = info->status.rates;
+++		u32 phy;
++ 
++ 		rate = &common->sbands[info->band].bitrates[rates[ridx].idx];
++ 		if (info->band == NL80211_BAND_2GHZ &&
++@@ -219,19 +219,18 @@ void ath_dynack_sample_tx_ts(struct ath_hw *ah, struct sk_buff *skb,
++ 		else
++ 			phy = WLAN_RC_PHY_OFDM;
++ 
++-		sifs = ath_dynack_get_sifs(ah, phy);
++-		da->st_rbf.ts[da->st_rbf.t_rb].dur -= sifs;
+++		dur -= ath_dynack_get_sifs(ah, phy);
++ 	}
++-
++-	ath_dbg(common, DYNACK, "{%pM} tx sample %u [dur %u][h %u-t %u]\n",
++-		hdr->addr1, da->st_rbf.ts[da->st_rbf.t_rb].tstamp,
++-		da->st_rbf.ts[da->st_rbf.t_rb].dur, da->st_rbf.h_rb,
++-		(da->st_rbf.t_rb + 1) % ATH_DYN_BUF);
+++	da->st_rbf.ts[da->st_rbf.t_rb].dur = dur;
++ 
++ 	INCR(da->st_rbf.t_rb, ATH_DYN_BUF);
++ 	if (da->st_rbf.t_rb == da->st_rbf.h_rb)
++ 		INCR(da->st_rbf.h_rb, ATH_DYN_BUF);
++ 
+++	ath_dbg(common, DYNACK, "{%pM} tx sample %u [dur %u][h %u-t %u]\n",
+++		hdr->addr1, ts->ts_tstamp, dur, da->st_rbf.h_rb,
+++		da->st_rbf.t_rb);
+++
++ 	ath_dynack_compute_to(ah);
++ 
++ 	spin_unlock_bh(&da->qlock);
++@@ -258,14 +257,13 @@ void ath_dynack_sample_ack_ts(struct ath_hw *ah, struct sk_buff *skb,
++ 	spin_lock_bh(&da->qlock);
++ 	da->ack_rbf.tstamp[da->ack_rbf.t_rb] = ts;
++ 
++-	ath_dbg(common, DYNACK, "rx sample %u [h %u-t %u]\n",
++-		da->ack_rbf.tstamp[da->ack_rbf.t_rb],
++-		da->ack_rbf.h_rb, (da->ack_rbf.t_rb + 1) % ATH_DYN_BUF);
++-
++ 	INCR(da->ack_rbf.t_rb, ATH_DYN_BUF);
++ 	if (da->ack_rbf.t_rb == da->ack_rbf.h_rb)
++ 		INCR(da->ack_rbf.h_rb, ATH_DYN_BUF);
++ 
+++	ath_dbg(common, DYNACK, "rx sample %u [h %u-t %u]\n",
+++		ts, da->ack_rbf.h_rb, da->ack_rbf.t_rb);
+++
++ 	ath_dynack_compute_to(ah);
++ 
++ 	spin_unlock_bh(&da->qlock);
+diff --git a/package/kernel/mac80211/patches/9603-ath9k-dynack-check-da-enabled-first-in-sampling-rout.patch b/package/kernel/mac80211/patches/9603-ath9k-dynack-check-da-enabled-first-in-sampling-rout.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..1bfe54f21ff854bb86bbef69b3d7ff3e051712e8
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9603-ath9k-dynack-check-da-enabled-first-in-sampling-rout.patch
+@@ -0,0 +1,39 @@
++From: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Date: Fri, 2 Nov 2018 21:49:57 +0100
++Subject: [PATCH] ath9k: dynack: check da->enabled first in sampling routines
++
++Check da->enabled flag first in ath_dynack_sample_tx_ts and
++ath_dynack_sample_ack_ts routines in order to avoid useless
++processing
++
++Tested-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
++Signed-off-by: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
++
++Origin: upstream, https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=9d3d65a91f027b8a9af5e63752d9b78cb10eb92d
++---
++ drivers/net/wireless/ath/ath9k/dynack.c | 4 ++--
++ 1 file changed, 2 insertions(+), 2 deletions(-)
++
++diff --git a/drivers/net/wireless/ath/ath9k/dynack.c b/drivers/net/wireless/ath/ath9k/dynack.c
++index 5c969d833825f84875b0aefea934c8bb4f9a0011..5c3b32f4e61b1da4216fb07525af7a1b85d5b6fb 100644
++--- a/drivers/net/wireless/ath/ath9k/dynack.c
+++++ b/drivers/net/wireless/ath/ath9k/dynack.c
++@@ -178,7 +178,7 @@ void ath_dynack_sample_tx_ts(struct ath_hw *ah, struct sk_buff *skb,
++ 	u32 dur = ts->duration;
++ 	u8 ridx;
++ 
++-	if ((info->flags & IEEE80211_TX_CTL_NO_ACK) || !da->enabled)
+++	if (!da->enabled || (info->flags & IEEE80211_TX_CTL_NO_ACK))
++ 		return;
++ 
++ 	spin_lock_bh(&da->qlock);
++@@ -251,7 +251,7 @@ void ath_dynack_sample_ack_ts(struct ath_hw *ah, struct sk_buff *skb,
++ 	struct ath_common *common = ath9k_hw_common(ah);
++ 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
++ 
++-	if (!ath_dynack_bssidmask(ah, hdr->addr1) || !da->enabled)
+++	if (!da->enabled || !ath_dynack_bssidmask(ah, hdr->addr1))
++ 		return;
++ 
++ 	spin_lock_bh(&da->qlock);
+diff --git a/package/kernel/mac80211/patches/9604-ath9k-dynack-make-ewma-estimation-faster.patch b/package/kernel/mac80211/patches/9604-ath9k-dynack-make-ewma-estimation-faster.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..c358e6746633df028848b1b285f1fdeac650b069
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9604-ath9k-dynack-make-ewma-estimation-faster.patch
+@@ -0,0 +1,155 @@
++From: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Date: Fri, 2 Nov 2018 21:49:58 +0100
++Subject: [PATCH] ath9k: dynack: make ewma estimation faster
++
++In order to make propagation time estimation faster,
++use current sample as ewma output value during 'late ack'
++tracking
++
++Tested-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
++Signed-off-by: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
++
++Origin: upstream, https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=0c60c490830a1a756c80f8de8d33d9c6359d4a36
++---
++ drivers/net/wireless/ath/ath9k/ath9k.h  |  2 +-
++ drivers/net/wireless/ath/ath9k/dynack.c | 28 ++++++++++++++++++-------
++ drivers/net/wireless/ath/ath9k/dynack.h |  6 ++++--
++ drivers/net/wireless/ath/ath9k/xmit.c   |  5 +++--
++ 4 files changed, 29 insertions(+), 12 deletions(-)
++
++diff --git a/drivers/net/wireless/ath/ath9k/ath9k.h b/drivers/net/wireless/ath/ath9k/ath9k.h
++index 21ba20981a80bfd4b96133c0b0a9ecd6c51f6c41..0fca44e91a71207ea03f9453d14c413a39d5b23c 100644
++--- a/drivers/net/wireless/ath/ath9k/ath9k.h
+++++ b/drivers/net/wireless/ath/ath9k/ath9k.h
++@@ -272,7 +272,7 @@ struct ath_node {
++ #endif
++ 	u8 key_idx[4];
++ 
++-	u32 ackto;
+++	int ackto;
++ 	struct list_head list;
++ };
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/dynack.c b/drivers/net/wireless/ath/ath9k/dynack.c
++index 5c3b32f4e61b1da4216fb07525af7a1b85d5b6fb..f112fa5b2eacfd149d01366712b63d30b8c35ed6 100644
++--- a/drivers/net/wireless/ath/ath9k/dynack.c
+++++ b/drivers/net/wireless/ath/ath9k/dynack.c
++@@ -29,9 +29,13 @@
++  * ath_dynack_ewma - EWMA (Exponentially Weighted Moving Average) calculation
++  *
++  */
++-static inline u32 ath_dynack_ewma(u32 old, u32 new)
+++static inline int ath_dynack_ewma(int old, int new)
++ {
++-	return (new * (EWMA_DIV - EWMA_LEVEL) + old * EWMA_LEVEL) / EWMA_DIV;
+++	if (old > 0)
+++		return (new * (EWMA_DIV - EWMA_LEVEL) +
+++			old * EWMA_LEVEL) / EWMA_DIV;
+++	else
+++		return new;
++ }
++ 
++ /**
++@@ -82,10 +86,10 @@ static inline bool ath_dynack_bssidmask(struct ath_hw *ah, const u8 *mac)
++  */
++ static void ath_dynack_compute_ackto(struct ath_hw *ah)
++ {
++-	struct ath_node *an;
++-	u32 to = 0;
++-	struct ath_dynack *da = &ah->dynack;
++ 	struct ath_common *common = ath9k_hw_common(ah);
+++	struct ath_dynack *da = &ah->dynack;
+++	struct ath_node *an;
+++	int to = 0;
++ 
++ 	list_for_each_entry(an, &da->nodes, list)
++ 		if (an->ackto > to)
++@@ -144,7 +148,8 @@ static void ath_dynack_compute_to(struct ath_hw *ah)
++ 					an->ackto = ath_dynack_ewma(an->ackto,
++ 								    ackto);
++ 					ath_dbg(ath9k_hw_common(ah), DYNACK,
++-						"%pM to %u\n", dst, an->ackto);
+++						"%pM to %d [%u]\n", dst,
+++						an->ackto, ackto);
++ 					if (time_is_before_jiffies(da->lto)) {
++ 						ath_dynack_compute_ackto(ah);
++ 						da->lto = jiffies + COMPUTE_TO;
++@@ -166,10 +171,12 @@ static void ath_dynack_compute_to(struct ath_hw *ah)
++  * @ah: ath hw
++  * @skb: socket buffer
++  * @ts: tx status info
+++ * @sta: station pointer
++  *
++  */
++ void ath_dynack_sample_tx_ts(struct ath_hw *ah, struct sk_buff *skb,
++-			     struct ath_tx_status *ts)
+++			     struct ath_tx_status *ts,
+++			     struct ieee80211_sta *sta)
++ {
++ 	struct ieee80211_hdr *hdr;
++ 	struct ath_dynack *da = &ah->dynack;
++@@ -191,9 +198,16 @@ void ath_dynack_sample_tx_ts(struct ath_hw *ah, struct sk_buff *skb,
++ 		    ieee80211_is_assoc_resp(hdr->frame_control) ||
++ 		    ieee80211_is_auth(hdr->frame_control)) {
++ 			ath_dbg(common, DYNACK, "late ack\n");
+++
++ 			ath9k_hw_setslottime(ah, (LATEACK_TO - 3) / 2);
++ 			ath9k_hw_set_ack_timeout(ah, LATEACK_TO);
++ 			ath9k_hw_set_cts_timeout(ah, LATEACK_TO);
+++			if (sta) {
+++				struct ath_node *an;
+++
+++				an = (struct ath_node *)sta->drv_priv;
+++				an->ackto = -1;
+++			}
++ 			da->lto = jiffies + LATEACK_DELAY;
++ 		}
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/dynack.h b/drivers/net/wireless/ath/ath9k/dynack.h
++index 6d7bef976742c1a87b498c35927e27476c314853..cf60224d40dff336986e3ed6bcc94b66e55d7b6c 100644
++--- a/drivers/net/wireless/ath/ath9k/dynack.h
+++++ b/drivers/net/wireless/ath/ath9k/dynack.h
++@@ -86,7 +86,8 @@ void ath_dynack_node_deinit(struct ath_hw *ah, struct ath_node *an);
++ void ath_dynack_init(struct ath_hw *ah);
++ void ath_dynack_sample_ack_ts(struct ath_hw *ah, struct sk_buff *skb, u32 ts);
++ void ath_dynack_sample_tx_ts(struct ath_hw *ah, struct sk_buff *skb,
++-			     struct ath_tx_status *ts);
+++			     struct ath_tx_status *ts,
+++			     struct ieee80211_sta *sta);
++ #else
++ static inline void ath_dynack_init(struct ath_hw *ah) {}
++ static inline void ath_dynack_node_init(struct ath_hw *ah,
++@@ -97,7 +98,8 @@ static inline void ath_dynack_sample_ack_ts(struct ath_hw *ah,
++ 					    struct sk_buff *skb, u32 ts) {}
++ static inline void ath_dynack_sample_tx_ts(struct ath_hw *ah,
++ 					   struct sk_buff *skb,
++-					   struct ath_tx_status *ts) {}
+++					   struct ath_tx_status *ts,
+++					   struct ieee80211_sta *sta) {}
++ #endif
++ 
++ #endif /* DYNACK_H */
++diff --git a/drivers/net/wireless/ath/ath9k/xmit.c b/drivers/net/wireless/ath/ath9k/xmit.c
++index 25b3fc82d4ac8761968bc64ebb491b2ee2b7f3c3..f448d571663980698edeabfd3cebabdd7e8a855e 100644
++--- a/drivers/net/wireless/ath/ath9k/xmit.c
+++++ b/drivers/net/wireless/ath/ath9k/xmit.c
++@@ -629,7 +629,7 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
++ 				if (bf == bf->bf_lastbf)
++ 					ath_dynack_sample_tx_ts(sc->sc_ah,
++ 								bf->bf_mpdu,
++-								ts);
+++								ts, sta);
++ 			}
++ 
++ 			ath_tx_complete_buf(sc, bf, txq, &bf_head, sta, ts,
++@@ -773,7 +773,8 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
++ 			memcpy(info->control.rates, bf->rates,
++ 			       sizeof(info->control.rates));
++ 			ath_tx_rc_status(sc, bf, ts, 1, txok ? 0 : 1, txok);
++-			ath_dynack_sample_tx_ts(sc->sc_ah, bf->bf_mpdu, ts);
+++			ath_dynack_sample_tx_ts(sc->sc_ah, bf->bf_mpdu, ts,
+++						sta);
++ 		}
++ 		ath_tx_complete_buf(sc, bf, txq, bf_head, sta, ts, txok);
++ 	} else
+diff --git a/package/kernel/mac80211/patches/9605-ath9k-dynack-remove-experimental-tag.patch b/package/kernel/mac80211/patches/9605-ath9k-dynack-remove-experimental-tag.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..8849eee056249aaf845629a41895c2ad3c27bfc1
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9605-ath9k-dynack-remove-experimental-tag.patch
+@@ -0,0 +1,29 @@
++From: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Date: Fri, 2 Nov 2018 21:49:59 +0100
++Subject: [PATCH] ath9k: dynack: remove 'experimental' tag
++
++Remove experimental tag from dynack Kconfig entry since it has
++been tested on outdoor 25Km links
++
++Tested-by: Koen Vandeputte <koen.vandeputte@ncentric.com>
++Signed-off-by: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
++Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
++
++Origin: upstream, https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=55bb78d265c6bdebbe2fbfe2c7a30539f3b3412c
++---
++ drivers/net/wireless/ath/ath9k/Kconfig | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/drivers/net/wireless/ath/ath9k/Kconfig b/drivers/net/wireless/ath/ath9k/Kconfig
++index 1f3523019509fe8fc28ebf329b3855652cb122f1..ceca23a851d5fa22c69ff4cffbf720d944e340be 100644
++--- a/drivers/net/wireless/ath/ath9k/Kconfig
+++++ b/drivers/net/wireless/ath/ath9k/Kconfig
++@@ -116,7 +116,7 @@ config ATH9K_DFS_CERTIFIED
++ 	  except increase code size.
++ 
++ config ATH9K_DYNACK
++-	bool "Atheros ath9k ACK timeout estimation algorithm (EXPERIMENTAL)"
+++	bool "Atheros ath9k ACK timeout estimation algorithm"
++ 	depends on ATH9K
++ 	default n
++ 	---help---
