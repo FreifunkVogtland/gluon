@@ -1,0 +1,261 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Tue, 20 Nov 2018 21:50:13 +0100
+Subject: mac80211: Provide SNR to batman-adv
+
+Forwarded: no
+
+diff --git a/package/kernel/mac80211/patches/9510-mac80211-add-function-for-batman-adv-to-read-signal-.patch b/package/kernel/mac80211/patches/9510-mac80211-add-function-for-batman-adv-to-read-signal-.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..39680b70f5c1b8c9603948c9292063035f378bd7
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9510-mac80211-add-function-for-batman-adv-to-read-signal-.patch
+@@ -0,0 +1,57 @@
++From: Open Mesh <postmaster@open-mesh.com>
++Date: Fri, 18 Sep 2015 09:49:25 +0200
++Subject: [PATCH] mac80211: add function for batman-adv to read signal of station
++
++Forwarded: not-needed
++ This is a private hack which will not be accepted by upstream. The
++ real solution here is to switch to B.A.T.M.A.N. V
++---
++ net/mac80211/cfg.c | 29 +++++++++++++++++++++++++++++
++ 1 file changed, 29 insertions(+)
++
++diff --git a/net/mac80211/cfg.c b/net/mac80211/cfg.c
++index 78762b0f5631c4509c9bdb407bcb125ab1fd4504..4865124071ef5fa268a4bba8a8b7a55c62ba1d40 100644
++--- a/net/mac80211/cfg.c
+++++ b/net/mac80211/cfg.c
++@@ -16,12 +16,41 @@
++ #include <linux/rcupdate.h>
++ #include <linux/if_ether.h>
++ #include <net/cfg80211.h>
+++#include <linux/export.h>
++ #include "ieee80211_i.h"
++ #include "driver-ops.h"
++ #include "rate.h"
++ #include "mesh.h"
++ #include "wme.h"
++ 
+++int mac80211_get_signal(struct net_device *net_dev, char *mac_addr, int *signal)
+++{
+++	struct ieee80211_sub_if_data *sdata;
+++	struct sta_info *sta;
+++	int res = -1;
+++
+++	if (!net_dev)
+++		goto out;
+++
+++	if (!net_dev->ieee80211_ptr)
+++		goto out;
+++
+++	sdata = IEEE80211_DEV_TO_SUB_IF(net_dev);
+++
+++	rcu_read_lock();
+++	sta = sta_info_get_bss(sdata, mac_addr);
+++
+++	if (sta) {
+++		*signal = (s8) -ewma_signal_read(&sta->rx_stats_avg.signal);
+++		res = 0;
+++	}
+++	rcu_read_unlock();
+++
+++out:
+++	return res;
+++}
+++EXPORT_SYMBOL_GPL(mac80211_get_signal);
+++
++ static struct wireless_dev *ieee80211_add_iface(struct wiphy *wiphy,
++ 						const char *name,
++ 						unsigned char name_assign_type,
+diff --git a/package/kernel/mac80211/patches/9516-ath9k-Use-per-chain-noisefloor.patch b/package/kernel/mac80211/patches/9516-ath9k-Use-per-chain-noisefloor.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..8debe5b753ae9c94962478c33832f6c52a2b1230
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9516-ath9k-Use-per-chain-noisefloor.patch
+@@ -0,0 +1,149 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Wed, 20 Apr 2016 11:36:07 +0200
++Subject: [PATCH] ath9k: Use per chain noisefloor
++
++The noisefloor for each chain can be detected extremely different. This
++leads to incorrect per-chain signal information. Splitting the noise
++information in an array allows to be more fine grained and avoids user
++reports of weak signals on a specific antennas when in reality the SNR is
++the same and only the noisefloor is different
++
++Forwarded: not-needed
++ Only required to get RSSI values for batman-adv/autorf/... Also helps us
++ to better compare hardware during rangetests.
++---
++ drivers/net/wireless/ath/ath9k/calib.c           | 6 +++++-
++ drivers/net/wireless/ath/ath9k/common-spectral.c | 6 +++---
++ drivers/net/wireless/ath/ath9k/common.c          | 4 ++--
++ drivers/net/wireless/ath/ath9k/debug.c           | 2 +-
++ drivers/net/wireless/ath/ath9k/hw.c              | 7 ++++++-
++ drivers/net/wireless/ath/ath9k/hw.h              | 2 +-
++ 6 files changed, 18 insertions(+), 9 deletions(-)
++
++diff --git a/drivers/net/wireless/ath/ath9k/calib.c b/drivers/net/wireless/ath/ath9k/calib.c
++index 0f71146b781d12dfcb5907fdecb3843b4260ad4b..1553d1a6c4544cb7d5f6fb4923717426fc1f852d 100644
++--- a/drivers/net/wireless/ath/ath9k/calib.c
+++++ b/drivers/net/wireless/ath/ath9k/calib.c
++@@ -391,6 +391,7 @@ bool ath9k_hw_getnf(struct ath_hw *ah, struct ath9k_channel *chan)
++ 	struct ath9k_nfcal_hist *h;
++ 	struct ieee80211_channel *c = chan->chan;
++ 	struct ath9k_hw_cal_data *caldata = ah->caldata;
+++	int i;
++ 
++ 	if (REG_READ(ah, AR_PHY_AGC_CONTROL) & AR_PHY_AGC_CONTROL_NF) {
++ 		ath_dbg(common, CALIBRATE,
++@@ -417,7 +418,10 @@ bool ath9k_hw_getnf(struct ath_hw *ah, struct ath9k_channel *chan)
++ 	clear_bit(NFCAL_PENDING, &caldata->cal_flags);
++ 	ath9k_hw_update_nfcal_hist_buffer(ah, caldata, nfarray);
++ 	chan->noisefloor = h[0].privNF;
++-	ah->noise = ath9k_hw_getchan_noise(ah, chan, chan->noisefloor);
+++
+++	for (i = 0; i < ARRAY_SIZE(ah->noise); i++)
+++		ah->noise[i] = ath9k_hw_getchan_noise(ah, chan, h[i].privNF);
+++
++ 	return true;
++ }
++ EXPORT_SYMBOL(ath9k_hw_getnf);
++diff --git a/drivers/net/wireless/ath/ath9k/common-spectral.c b/drivers/net/wireless/ath/ath9k/common-spectral.c
++index 58f1ed13c81f9c1d4f61b2a1523b9497f49d2e54..fd10af5713a84a2a8bed4fb3ee7741dfbaf22782 100644
++--- a/drivers/net/wireless/ath/ath9k/common-spectral.c
+++++ b/drivers/net/wireless/ath/ath9k/common-spectral.c
++@@ -161,7 +161,7 @@ ath_cmn_process_ht20_fft(struct ath_rx_status *rs,
++ 	fft_sample_20.tlv.length = __cpu_to_be16(length);
++ 	fft_sample_20.freq = __cpu_to_be16(freq);
++ 	fft_sample_20.rssi = fix_rssi_inv_only(rs->rs_rssi_ctl[0]);
++-	fft_sample_20.noise = ah->noise;
+++	fft_sample_20.noise = ah->noise[0];
++ 
++ 	mag_info = (struct ath_ht20_mag_info *) (sample_buf +
++ 					SPECTRAL_HT20_NUM_BINS);
++@@ -280,14 +280,14 @@ ath_cmn_process_ht20_40_fft(struct ath_rx_status *rs,
++ 		lower_rssi = fix_rssi_inv_only(rs->rs_rssi_ctl[0]);
++ 		upper_rssi = fix_rssi_inv_only(rs->rs_rssi_ext[0]);
++ 
++-		fft_sample_40.lower_noise = ah->noise;
+++		fft_sample_40.lower_noise = ah->noise[0];
++ 		fft_sample_40.upper_noise = ext_nf;
++ 	} else {
++ 		lower_rssi = fix_rssi_inv_only(rs->rs_rssi_ext[0]);
++ 		upper_rssi = fix_rssi_inv_only(rs->rs_rssi_ctl[0]);
++ 
++ 		fft_sample_40.lower_noise = ext_nf;
++-		fft_sample_40.upper_noise = ah->noise;
+++		fft_sample_40.upper_noise = ah->noise[0];
++ 	}
++ 
++ 	fft_sample_40.lower_rssi = lower_rssi;
++diff --git a/drivers/net/wireless/ath/ath9k/common.c b/drivers/net/wireless/ath/ath9k/common.c
++index dbf495699cc5b2ec8761d099daa1038631ec49b2..2cf0f57fe70573a63ca649d9faa90980fd4d0443 100644
++--- a/drivers/net/wireless/ath/ath9k/common.c
+++++ b/drivers/net/wireless/ath/ath9k/common.c
++@@ -245,7 +245,7 @@ void ath9k_cmn_process_rssi(struct ath_common *common,
++ 		rssi = rx_stats->rs_rssi_ctl[i];
++ 		if (rssi != ATH9K_RSSI_BAD) {
++ 		    rxs->chains |= BIT(j);
++-		    rxs->chain_signal[j] = ah->noise + rssi;
+++		    rxs->chain_signal[j] = ah->noise[i] + rssi;
++ 		}
++ 		j++;
++ 	}
++@@ -267,7 +267,7 @@ void ath9k_cmn_process_rssi(struct ath_common *common,
++ 		ah->stats.avgbrssi = rssi;
++ 	}
++ 
++-	rxs->signal = ah->noise + rx_stats->rs_rssi;
+++	rxs->signal = ah->noise[0] + rx_stats->rs_rssi;
++ }
++ EXPORT_SYMBOL(ath9k_cmn_process_rssi);
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/debug.c b/drivers/net/wireless/ath/ath9k/debug.c
++index 181524d9d6b88c50d9e699b3a84b59e3352afb84..59b7494aba98240b187f52314f7a1361dbec42de 100644
++--- a/drivers/net/wireless/ath/ath9k/debug.c
+++++ b/drivers/net/wireless/ath/ath9k/debug.c
++@@ -975,7 +975,7 @@ static int read_file_dump_nfcal(struct seq_file *file, void *data)
++ 	u8 chainmask = (ah->rxchainmask << 3) | ah->rxchainmask;
++ 	u8 nread;
++ 
++-	seq_printf(file, "Channel Noise Floor : %d\n", ah->noise);
+++	seq_printf(file, "Channel Noise Floor : %d\n", ah->noise[0]);
++ 	seq_puts(file, "Chain | privNF | # Readings | NF Readings\n");
++ 	for (i = 0; i < NUM_NF_READINGS; i++) {
++ 		if (!(chainmask & (1 << i)) ||
++diff --git a/drivers/net/wireless/ath/ath9k/hw.c b/drivers/net/wireless/ath/ath9k/hw.c
++index fd97d3bfae482fd65bf0761e96480823446ee9d6..6b8c5d61ece7a791fb19b1ee1667e12b7d1e20ab 100644
++--- a/drivers/net/wireless/ath/ath9k/hw.c
+++++ b/drivers/net/wireless/ath/ath9k/hw.c
++@@ -1890,6 +1890,7 @@ int ath9k_hw_reset(struct ath_hw *ah, struct ath9k_channel *chan,
++ 	int r;
++ 	bool start_mci_reset = false;
++ 	bool save_fullsleep = ah->chip_fullsleep;
+++	int i;
++ 
++ 	if (ath9k_hw_mci_is_enabled(ah)) {
++ 		start_mci_reset = ar9003_mci_start_reset(ah, chan);
++@@ -1912,7 +1913,11 @@ int ath9k_hw_reset(struct ath_hw *ah, struct ath9k_channel *chan,
++ 	} else if (caldata) {
++ 		clear_bit(PAPRD_PACKET_SENT, &caldata->cal_flags);
++ 	}
++-	ah->noise = ath9k_hw_getchan_noise(ah, chan, chan->noisefloor);
+++
+++	for (i = 0; i < ARRAY_SIZE(ah->noise); i++)
+++		/* TODO chan->noisefloor also split into per chain setting? */
+++		ah->noise[i] = ath9k_hw_getchan_noise(ah, chan,
+++						      chan->noisefloor);
++ 
++ 	if (fastcc) {
++ 		r = ath9k_hw_do_fastcc(ah, chan);
++diff --git a/drivers/net/wireless/ath/ath9k/hw.h b/drivers/net/wireless/ath/ath9k/hw.h
++index c66eada152f6daa961e75bb2db5a22dec3b532da..dfedac02e4791f3e4711d553e86b509a1bcc865a 100644
++--- a/drivers/net/wireless/ath/ath9k/hw.h
+++++ b/drivers/net/wireless/ath/ath9k/hw.h
++@@ -821,7 +821,7 @@ struct ath_hw {
++ 	enum nl80211_iftype opmode;
++ 	enum ath9k_power_mode power_mode;
++ 
++-	s8 noise;
+++	s8 noise[NUM_NF_READINGS];
++ 	struct ath9k_hw_cal_data *caldata;
++ 	struct ath9k_pacal_info pacal_info;
++ 	struct ar5416Stats stats;
+diff --git a/package/kernel/mac80211/patches/9517-ath9k-Use-default-noisefloor-to-show-pseudo-SNR-as-s.patch b/package/kernel/mac80211/patches/9517-ath9k-Use-default-noisefloor-to-show-pseudo-SNR-as-s.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..230af1df9433cb015d653e47a4c2c059491fff33
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9517-ath9k-Use-default-noisefloor-to-show-pseudo-SNR-as-s.patch
+@@ -0,0 +1,31 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Wed, 20 Apr 2016 11:50:47 +0200
++Subject: [PATCH] ath9k: Use default noisefloor to show pseudo-SNR as signal intensity
++
++The Open-Mesh software uses the signal information from the wifi driver to
++find out how well the link to a neighbor is. But the quality heavily
++depends on the noisefloor. So tools like autorf, batman-adv and the
++dashboard will only use an absolute signal value when actually an SNR would
++be interesting. This can be avoided when the per-chain values stay at the
++absolute value and the combined signal strength is modified to use -95 +
++SNR as its value.
++
++Forwarded: not-needed
++ This is only required for private patches/tools from Open-Mesh.com
++---
++ drivers/net/wireless/ath/ath9k/common.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/drivers/net/wireless/ath/ath9k/common.c b/drivers/net/wireless/ath/ath9k/common.c
++index 2cf0f57fe70573a63ca649d9faa90980fd4d0443..10b8d20098f7922c37f75ce0378f7e63d7586ec6 100644
++--- a/drivers/net/wireless/ath/ath9k/common.c
+++++ b/drivers/net/wireless/ath/ath9k/common.c
++@@ -267,7 +267,7 @@ void ath9k_cmn_process_rssi(struct ath_common *common,
++ 		ah->stats.avgbrssi = rssi;
++ 	}
++ 
++-	rxs->signal = ah->noise[0] + rx_stats->rs_rssi;
+++	rxs->signal = ATH_DEFAULT_NOISE_FLOOR + rx_stats->rs_rssi;
++ }
++ EXPORT_SYMBOL(ath9k_cmn_process_rssi);
++ 
