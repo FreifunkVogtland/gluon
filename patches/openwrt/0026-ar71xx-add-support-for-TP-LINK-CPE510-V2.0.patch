@@ -1,0 +1,88 @@
+From: Andrew Cameron <apcameron@softhome.net>
+Date: Tue, 26 Jun 2018 22:09:03 -0500
+Subject: ar71xx: add support for TP-LINK CPE510 V2.0
+
+Adds Support for the TP-LINK CPE510 V2.0 by TP-Link.
+The hardware is almost the same as the CPE510 V1.0
+Follow the same processes as for the CPE510 V1.0
+
+Signed-off-by: Andrew Cameron <apcameron@softhome.net>
+
+Origin: backport, https://git.openwrt.org/?p=openwrt/openwrt.git;a=commit;h=bae927c551fdd91fbc8343071e4b5c44f73eee0d
+
+diff --git a/target/linux/ar71xx/base-files/lib/ar71xx.sh b/target/linux/ar71xx/base-files/lib/ar71xx.sh
+index 2200069c647b33220126e797b6a61928d1fb428e..6794a442ea57137a76f03a43b9a4f5832a391c3f 100755
+--- a/target/linux/ar71xx/base-files/lib/ar71xx.sh
++++ b/target/linux/ar71xx/base-files/lib/ar71xx.sh
+@@ -592,7 +592,14 @@ ar71xx_board_detect() {
+ 		;;
+ 	*"CPE510/520")
+ 		name="cpe510"
+-		tplink_pharos_board_detect "$(tplink_pharos_get_model_string | tr -d '\r')"
++		tplink_pharos_board_detect "$(tplink_pharos_v2_get_model_string)"
++		case $AR71XX_MODEL in
++		'TP-Link CPE510 v2.0')
++			;;
++		*)
++			tplink_pharos_board_detect "$(tplink_pharos_get_model_string | tr -d '\r')"
++			;;
++		esac
+ 		;;
+ 	*"CPE830")
+ 		name="cpe830"
+diff --git a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
+index a04dd7441d28e9db4dc7c744707bb5f35936da00..faa31e5fd8660cf754164959330aaebfeb205eac 100755
+--- a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
++++ b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
+@@ -580,7 +580,6 @@ platform_check_image() {
+ 		return $?
+ 		;;
+ 	cpe210|\
+-	cpe510|\
+ 	eap120|\
+ 	wbs210|\
+ 	wbs510)
+@@ -592,6 +591,20 @@ platform_check_image() {
+ 		tplink_pharos_check_image "$1" "01000000" "$(tplink_pharos_v2_get_model_string)" '\0\xff\r' && return 0
+ 		return 1
+ 		;;
++	cpe510)
++		local modelstr="$(tplink_pharos_v2_get_model_string)"
++		tplink_pharos_board_detect $modelstr
++		case $AR71XX_MODEL in
++		'TP-Link CPE510 v2.0')
++			tplink_pharos_check_image "$1" "7f454c46" "$modelstr" '\0\xff\r' && return 0
++			return 1
++			;;
++		*)
++			tplink_pharos_check_image "$1" "7f454c46" "$(tplink_pharos_get_model_string)" '' && return 0
++			return 1
++			;;
++		esac
++		;;
+ 	a40|\
+ 	a60|\
+ 	mr1750|\
+diff --git a/tools/firmware-utils/src/tplink-safeloader.c b/tools/firmware-utils/src/tplink-safeloader.c
+index de15faf6796c993efc6c2a36b22bb1e978e3be90..927b24b6e074c4da2afc55835a5648138c21bd83 100644
+--- a/tools/firmware-utils/src/tplink-safeloader.c
++++ b/tools/firmware-utils/src/tplink-safeloader.c
+@@ -246,7 +246,17 @@ static struct device_info boards[] = {
+ 			"CPE510(TP-LINK|EU|N300-5):1.1\r\n"
+ 			"CPE520(TP-LINK|UN|N300-5):1.1\r\n"
+ 			"CPE520(TP-LINK|US|N300-5):1.1\r\n"
+-			"CPE520(TP-LINK|EU|N300-5):1.1\r\n",
++			"CPE520(TP-LINK|EU|N300-5):1.1\r\n"
++			"CPE510(TP-LINK|EU|N300-5|00000000):2.0\r\n"
++			"CPE510(TP-LINK|EU|N300-5|45550000):2.0\r\n"
++			"CPE510(TP-LINK|EU|N300-5|55530000):2.0\r\n"
++			"CPE510(TP-LINK|UN|N300-5|00000000):2.0\r\n"
++			"CPE510(TP-LINK|UN|N300-5|45550000):2.0\r\n"
++			"CPE510(TP-LINK|UN|N300-5|55530000):2.0\r\n"
++			"CPE510(TP-LINK|US|N300-5|55530000):2.0\r\n"
++			"CPE510(TP-LINK|UN|N300-5):2.0\r\n"
++			"CPE510(TP-LINK|EU|N300-5):2.0\r\n"
++			"CPE510(TP-LINK|US|N300-5):2.0\r\n",
+ 		.support_trail = '\xff',
+ 		.soft_ver = NULL,
+ 
