@@ -1,0 +1,123 @@
+From: Sven Eckelmann <sven.eckelmann@openmesh.com>
+Date: Mon, 30 Jul 2018 17:43:48 +0200
+Subject: ipq40xx: Limit usable channels for OpenMesh A62 PHYs
+
+The OpenMesh A62 is a tri-band device (1x 2.4GHz, 2x 5GHz) with special
+filters in front of the RX+TX paths to the 5GHz PHYs. These filtered
+channel can in theory still be used by the hardware but the signal strength
+is reduced so much that it makes no sense.
+
+Signed-off-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
+
+Origin: backport, https://github.com/openwrt/openwrt/commit/e3b8ae2b09e137ce2eae33551923daf302293a0c
+
+diff --git a/package/kernel/ath10k-ct/patches/9584-ath10k-Limit-available-channels-via-DT-ieee80211-fre.patch b/package/kernel/ath10k-ct/patches/9584-ath10k-Limit-available-channels-via-DT-ieee80211-fre.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..27bf62fd4e4124d4cafd247032940cecf14d8f2e
+--- /dev/null
++++ b/package/kernel/ath10k-ct/patches/9584-ath10k-Limit-available-channels-via-DT-ieee80211-fre.patch
+@@ -0,0 +1,40 @@
++From: Sven Eckelmann <sven.eckelmann@openmesh.com>
++Date: Mon, 30 Jul 2018 17:31:41 +0200
++Subject: [PATCH] ath10k: Limit available channels via DT ieee80211-freq-limit
++
++Tri-band devices (1x 2.4GHz + 2x 5GHz) often incorporate special filters in
++the RX and TX path. These filtered channel can in theory still be used by
++the hardware but the signal strength is reduced so much that it makes no
++sense.
++
++There is already a DT property to limit the available channels but ath10k
++has to manually call this functionality to limit the currrently set wiphy
++channels further.
++
++Signed-off-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
++
++Forwarded: https://patchwork.kernel.org/patch/10549245/
++---
++ ath10k-4.13/mac.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/ath10k-4.13/mac.c b/ath10k-4.13/mac.c
++index 719b5f3bd4e6d4149387b46691055f3757a867fc..619e2fb0546d74f27029c1d98694337f9d6ee771 100644
++--- a/ath10k-4.13/mac.c
+++++ b/ath10k-4.13/mac.c
++@@ -17,6 +17,7 @@
++ 
++ #include "mac.h"
++ 
+++#include <net/cfg80211.h>
++ #include <net/mac80211.h>
++ #include <linux/etherdevice.h>
++ #include <linux/acpi.h>
++@@ -8306,6 +8307,7 @@ int ath10k_mac_register(struct ath10k *ar)
++ 		ar->hw->wiphy->bands[NL80211_BAND_5GHZ] = band;
++ 	}
++ 
+++	wiphy_read_of_freq_limits(ar->hw->wiphy);
++ 	ath10k_mac_setup_ht_vht_cap(ar);
++ 
++ 	ar->hw->wiphy->interface_modes =
+diff --git a/package/kernel/mac80211/patches/9584-ath10k-Limit-available-channels-via-DT-ieee80211-fre.patch b/package/kernel/mac80211/patches/9584-ath10k-Limit-available-channels-via-DT-ieee80211-fre.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..42d24719c34b50c6348d58bc3ee271006e468400
+--- /dev/null
++++ b/package/kernel/mac80211/patches/9584-ath10k-Limit-available-channels-via-DT-ieee80211-fre.patch
+@@ -0,0 +1,40 @@
++From: Sven Eckelmann <sven.eckelmann@openmesh.com>
++Date: Mon, 30 Jul 2018 17:31:41 +0200
++Subject: [PATCH] ath10k: Limit available channels via DT ieee80211-freq-limit
++
++Tri-band devices (1x 2.4GHz + 2x 5GHz) often incorporate special filters in
++the RX and TX path. These filtered channel can in theory still be used by
++the hardware but the signal strength is reduced so much that it makes no
++sense.
++
++There is already a DT property to limit the available channels but ath10k
++has to manually call this functionality to limit the currrently set wiphy
++channels further.
++
++Signed-off-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
++
++Forwarded: https://patchwork.kernel.org/patch/10549245/
++---
++ drivers/net/wireless/ath/ath10k/mac.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/drivers/net/wireless/ath/ath10k/mac.c b/drivers/net/wireless/ath/ath10k/mac.c
++index 719b5f3bd4e6d4149387b46691055f3757a867fc..619e2fb0546d74f27029c1d98694337f9d6ee771 100644
++--- a/drivers/net/wireless/ath/ath10k/mac.c
+++++ b/drivers/net/wireless/ath/ath10k/mac.c
++@@ -17,6 +17,7 @@
++ 
++ #include "mac.h"
++ 
+++#include <net/cfg80211.h>
++ #include <net/mac80211.h>
++ #include <linux/etherdevice.h>
++ #include <linux/acpi.h>
++@@ -8306,6 +8307,7 @@ int ath10k_mac_register(struct ath10k *ar)
++ 		ar->hw->wiphy->bands[NL80211_BAND_5GHZ] = band;
++ 	}
++ 
+++	wiphy_read_of_freq_limits(ar->hw->wiphy);
++ 	ath10k_mac_setup_ht_vht_cap(ar);
++ 
++ 	ar->hw->wiphy->interface_modes =
+diff --git a/target/linux/ipq40xx/files-4.14/arch/arm/boot/dts/qcom-ipq4019-a62.dts b/target/linux/ipq40xx/files-4.14/arch/arm/boot/dts/qcom-ipq4019-a62.dts
+index dd6d6bd775799f01a28a54b187a74ff37521494e..47df2da24028263a5c4dd463a34518d4b87b7b26 100644
+--- a/target/linux/ipq40xx/files-4.14/arch/arm/boot/dts/qcom-ipq4019-a62.dts
++++ b/target/linux/ipq40xx/files-4.14/arch/arm/boot/dts/qcom-ipq4019-a62.dts
+@@ -225,6 +225,7 @@
+ 			reg = <0 0 0 0 0>;
+ 			device_type = "pci";
+ 			qcom,ath10k-calibration-variant = "OM-A62";
++			ieee80211-freq-limit = <5170000 5350000>;
+ 		};
+ 	};
+ };
+@@ -237,4 +238,5 @@
+ &wifi1 {
+ 	status = "okay";
+ 	qcom,ath10k-calibration-variant = "OM-A62";
++	ieee80211-freq-limit = <5470000 5875000>;
+ };
