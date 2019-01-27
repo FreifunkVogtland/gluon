@@ -43,6 +43,10 @@ config '# CONFIG_KMOD_BATMAN_ADV_MCAST is not set'
 
 config 'CONFIG_PACKAGE_ATH_DEBUG=y'
 
+if env.GLUON_WLAN_MESH ~= 'ramips-rt305x' then
+       try_config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
+end
+
 config '# CONFIG_KERNEL_IP_MROUTE is not set'
 config '# CONFIG_KERNEL_IPV6_MROUTE is not set'
 
