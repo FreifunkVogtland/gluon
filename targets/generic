@@ -49,6 +49,10 @@ try_config('TARGET_SQUASHFS_BLOCK_SIZE', 256)
 config('KERNEL_IP_MROUTE', false)
 config('KERNEL_IPV6_MROUTE', false)
 
+if env.GLUON_TARGET ~= 'ramips-rt305x' and env.GLUON_TARGET ~= 'ar71xx-tiny' then
+       try_config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
+end
+
 config('COLLECT_KERNEL_DEBUG', true)
 
 try_config('TARGET_MULTI_PROFILE', true)
