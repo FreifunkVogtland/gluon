@@ -63,6 +63,7 @@ Several Freifunk communities in Germany use Gluon as the foundation of their Fre
    package/gluon-ebtables-limit-arp
    package/gluon-ebtables-source-filter
    package/gluon-radv-filterd
+   package/gluon-scheduled-domain-switch
    package/gluon-web-admin
    package/gluon-web-logging
 
@@ -70,6 +71,7 @@ Several Freifunk communities in Germany use Gluon as the foundation of their Fre
    :caption: Releases
    :maxdepth: 1
 
+   releases/v2018.2.1
    releases/v2018.2
    releases/v2018.1.4
    releases/v2018.1.3
@@ -135,6 +137,7 @@ ar71xx-generic
 * AVM
 
   - Fritz!Box 4020 [#avmflash]_
+  - Fritz!WLAN Repeater 300E [#avmflash]_
   - Fritz!WLAN Repeater 450E [#avmflash]_
 
 * Buffalo
@@ -351,6 +354,10 @@ ramips-mt7620
   - GL-MT300N [#80211s]_
   - GL-MT750 [#80211s]_
 
+* Nexx
+
+  - WT3020AD/F/H
+
 ramips-mt7621
 ^^^^^^^^^^^^^
 
@@ -370,6 +377,20 @@ ramips-mt7621
 
 ramips-mt76x8
 ^^^^^^^^^^^^^
+
+* GL.iNet
+
+  - GL-MT300N v2 [#80211s]_
+
+* NETGEAR
+
+  - R6120 [#80211s]_
+
+* TP-Link
+
+  - TL-WR841N v13 [#80211s]_
+  - Archer C50 v3 [#80211s]_
+  - Archer C50 v4 [#80211s]_
 
 * VoCore
 

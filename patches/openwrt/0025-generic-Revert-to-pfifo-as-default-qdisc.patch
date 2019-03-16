@@ -4,11 +4,11 @@ Subject: generic: Revert to pfifo as default qdisc
 
 Forwarded: no
 
-diff --git a/package/kernel/mac80211/914-mac80211-reduce_txqueuelen.patch b/package/kernel/mac80211/914-mac80211-reduce_txqueuelen.patch
+diff --git a/package/kernel/mac80211/patches/914-mac80211-reduce_txqueuelen.patch b/package/kernel/mac80211/patches/914-mac80211-reduce_txqueuelen.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..13e7abd85171662cd8d79393e2ef454f31685cbd
+index 0000000000000000000000000000000000000000..c700f1ddb6623203288985c8c88e0eed49200354
 --- /dev/null
-+++ b/package/kernel/mac80211/914-mac80211-reduce_txqueuelen.patch
++++ b/package/kernel/mac80211/patches/914-mac80211-reduce_txqueuelen.patch
 @@ -0,0 +1,12 @@
 +diff --git a/net/mac80211/iface.c b/net/mac80211/iface.c
 +index e156130af9062a8faf441101ec1bf57870ecbc64..06e31074e480de8f87943dd3a06c36c211f2a4ec 100644
@@ -17,11 +17,11 @@ index 0000000000000000000000000000000000000000..13e7abd85171662cd8d79393e2ef454f
 +@@ -1271,6 +1271,7 @@ static void __ieee80211_if_free(struct net_device *ndev){
 + static void ieee80211_if_setup(struct net_device *dev)
 + {
-+ 	ether_setup(dev);
-++	dev->tx_queue_len = 32 * 8;
-+ 	dev->priv_flags &= ~IFF_TX_SKB_SHARING;
-+ 	dev->netdev_ops = &ieee80211_dataif_ops;
-+ 	netdev_set_priv_destructor(dev, ieee80211_if_free);
++      ether_setup(dev);
+++     dev->tx_queue_len = 32 * 8;
++      dev->priv_flags &= ~IFF_TX_SKB_SHARING;
++      dev->netdev_ops = &ieee80211_dataif_ops;
++      netdev_set_priv_destructor(dev, ieee80211_if_free);
 diff --git a/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch b/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch
 deleted file mode 100644
 index d1e92ae40af4cb12a66a4d063833396ddf2b374e..0000000000000000000000000000000000000000
@@ -289,7 +289,7 @@ index 7b6e38da2934239e012ad3594c892b807c3a2e67..00000000000000000000000000000000
 - 
 diff --git a/target/linux/generic/hack-4.9/661-use_fq_codel_by_default.patch b/target/linux/generic/hack-4.9/661-use_fq_codel_by_default.patch
 deleted file mode 100644
-index 981170cbb1e2b868d9a0c1626fd12c6f4a9aec68..0000000000000000000000000000000000000000
+index 34fc2a37c3f19c0f982a1c9a3ae0c047a3ce60da..0000000000000000000000000000000000000000
 --- a/target/linux/generic/hack-4.9/661-use_fq_codel_by_default.patch
 +++ /dev/null
 @@ -1,94 +0,0 @@
@@ -339,7 +339,7 @@ index 981170cbb1e2b868d9a0c1626fd12c6f4a9aec68..00000000000000000000000000000000
 - 	  device, it has to decide which ones to send first, which ones to
 ---- a/net/sched/sch_api.c
 -+++ b/net/sched/sch_api.c
--@@ -1978,7 +1978,7 @@ static int __init pktsched_init(void)
+-@@ -1977,7 +1977,7 @@ static int __init pktsched_init(void)
 - 		return err;
 - 	}
 - 
