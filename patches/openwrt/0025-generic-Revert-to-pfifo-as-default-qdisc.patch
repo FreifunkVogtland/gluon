@@ -6,22 +6,20 @@ Forwarded: no
 
 diff --git a/package/kernel/mac80211/patches/914-mac80211-reduce_txqueuelen.patch b/package/kernel/mac80211/patches/914-mac80211-reduce_txqueuelen.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..c700f1ddb6623203288985c8c88e0eed49200354
+index 0000000000000000000000000000000000000000..27cc60fcb49472698d13380653117ea719484138
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/914-mac80211-reduce_txqueuelen.patch
-@@ -0,0 +1,12 @@
-+diff --git a/net/mac80211/iface.c b/net/mac80211/iface.c
-+index e156130af9062a8faf441101ec1bf57870ecbc64..06e31074e480de8f87943dd3a06c36c211f2a4ec 100644
+@@ -0,0 +1,10 @@
 +--- a/net/mac80211/iface.c
 ++++ b/net/mac80211/iface.c
-+@@ -1271,6 +1271,7 @@ static void __ieee80211_if_free(struct net_device *ndev){
++@@ -1271,6 +1271,7 @@ static void __ieee80211_if_free(struct n
 + static void ieee80211_if_setup(struct net_device *dev)
 + {
-+      ether_setup(dev);
-++     dev->tx_queue_len = 32 * 8;
-+      dev->priv_flags &= ~IFF_TX_SKB_SHARING;
-+      dev->netdev_ops = &ieee80211_dataif_ops;
-+      netdev_set_priv_destructor(dev, ieee80211_if_free);
++ 	ether_setup(dev);
+++	dev->tx_queue_len = 32 * 8;
++ 	dev->priv_flags &= ~IFF_TX_SKB_SHARING;
++ 	dev->netdev_ops = &ieee80211_dataif_ops;
++ 	netdev_set_priv_destructor(dev, ieee80211_if_free);
 diff --git a/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch b/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch
 deleted file mode 100644
 index d1e92ae40af4cb12a66a4d063833396ddf2b374e..0000000000000000000000000000000000000000
