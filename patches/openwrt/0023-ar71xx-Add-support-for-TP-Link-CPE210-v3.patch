@@ -26,7 +26,7 @@ Stock device TFTP adress:192.168.0.254
 Signed-off-by: Robert Marko <robimarko@gmail.com>
 
 diff --git a/target/linux/ar71xx/base-files/etc/board.d/01_leds b/target/linux/ar71xx/base-files/etc/board.d/01_leds
-index 592133ac286b5bd5d1a82bce7e5d2cd8486a363b..89cc0cbff7822026a78240d115226311dfe6cd40 100755
+index 23f3d23bf53883fb08944bc65b98cac06a16c0a5..e0222f3637b60b89a6ef6c0d10cfb20fbe73f075 100755
 --- a/target/linux/ar71xx/base-files/etc/board.d/01_leds
 +++ b/target/linux/ar71xx/base-files/etc/board.d/01_leds
 @@ -249,6 +249,7 @@ cf-e530n)
@@ -48,7 +48,7 @@ index 592133ac286b5bd5d1a82bce7e5d2cd8486a363b..89cc0cbff7822026a78240d115226311
  		;;
  	*)
 diff --git a/target/linux/ar71xx/base-files/etc/board.d/02_network b/target/linux/ar71xx/base-files/etc/board.d/02_network
-index 6f5f07e1c5d0c4d0b88c9b171f7cf208cf98cb49..0905a93785923cfb8b1c65dba20cef824a574b87 100755
+index e9522252a2b8ba7de1c8ca7d070ff7f2897aade9..386d93e58451b953937320b1bfe8d71ed73c69fd 100755
 --- a/target/linux/ar71xx/base-files/etc/board.d/02_network
 +++ b/target/linux/ar71xx/base-files/etc/board.d/02_network
 @@ -75,6 +75,7 @@ ar71xx_setup_interfaces()
@@ -115,7 +115,7 @@ index 80f6e1d95b7a4e5559e7d5da041b32d962ad4e84..c82cb17cf613bdb3796a15e384215d45
  	ATH79_MACH_CPE510,			/* TP-LINK CPE510 */
  	ATH79_MACH_CPE830,			/* YunCore CPE830 */
 diff --git a/target/linux/ar71xx/image/generic-tp-link.mk b/target/linux/ar71xx/image/generic-tp-link.mk
-index 338b2db2d65f0e80b2dfb3d710991c41813bd649..571235a3b3b7fe305549039a0a21b671c6e45f7f 100644
+index daf6c35ae4610d844bd9e8f44ea5deab72143a48..2a6faa54dbe07d77e6ef6ac0c9dc33186762e36a 100644
 --- a/target/linux/ar71xx/image/generic-tp-link.mk
 +++ b/target/linux/ar71xx/image/generic-tp-link.mk
 @@ -195,6 +195,13 @@ define Device/cpe210-v2

@@ -58,4 +58,4 @@ fi
 
 
 packages '-odhcpd-ipv6only' '-ppp' '-ppp-mod-pppoe' '-wpad-mini'
-packages 'gluon-core' 'ip6tables' 'hostapd-mini'
+packages 'gluon-core' 'ip6tables'
