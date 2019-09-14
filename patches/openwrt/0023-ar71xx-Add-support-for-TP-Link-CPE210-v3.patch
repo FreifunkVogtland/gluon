@@ -1,9 +1,8 @@
-From: Robert Marko <robimarko@gmail.com>
-Date: Sat, 11 Aug 2018 17:32:48 +0200
+From: Adrian Schmutzler <freifunk@adrianschmutzler.de>
+Date: Wed, 10 Oct 2018 20:13:09 +0200
 Subject: ar71xx: Add support for TP-Link CPE210 v3
 
- ar71xx: Add support for TP-Link CPE210 v3.
-Looks identical to the v2.
+Looks identical to the v2
 
 This PR adds support for a popular low-cost 2.4GHz N based AP
 
@@ -15,15 +14,18 @@ Specifications:
  - Ethernet: 1x 100/10 Mbps, integrated into SoC, 24V POE IN
 
 Installation:
-Flash factory image through stock firmware WEB UI
-or through TFTP
-To get to TFTP recovery just hold reset button while powering on for
-around 4-5 seconds and release.
+Flash factory image through stock firmware WEB UI or
+through TFTP
+To get to TFTP recovery just hold reset button while
+powering on for around 4-5 seconds and release.
 Rename factory image to recovery.bin
 Stock TFTP server IP:192.168.0.100
-Stock device TFTP adress:192.168.0.254
+Stock device TFTP address:192.168.0.254
 
 Signed-off-by: Robert Marko <robimarko@gmail.com>
+[Adjusted for separate safeloader entry, do not inherit device
+definition from cpe210-v2]
+Signed-off-by: Adrian Schmutzler <freifunk@adrianschmutzler.de>
 
 diff --git a/target/linux/ar71xx/base-files/etc/board.d/01_leds b/target/linux/ar71xx/base-files/etc/board.d/01_leds
 index 23f3d23bf53883fb08944bc65b98cac06a16c0a5..e0222f3637b60b89a6ef6c0d10cfb20fbe73f075 100755
@@ -89,7 +91,7 @@ index ca1270b7fdc84c53f8417c226f18ca4fff1f27d8..a04dd7441d28e9db4dc7c744707bb5f3
  		return 1
  		;;
 diff --git a/target/linux/ar71xx/files/arch/mips/ath79/mach-cpe510.c b/target/linux/ar71xx/files/arch/mips/ath79/mach-cpe510.c
-index ceb1769ddd522d51014228fe65e2662f2f3e627c..16efbc8802ab96a10aab474721902344664c7f8f 100644
+index ceb1769ddd522d51014228fe65e2662f2f3e627c..f25a69f08e8a69d9b6de0ca9d7d7d14f8dff5fa0 100644
 --- a/target/linux/ar71xx/files/arch/mips/ath79/mach-cpe510.c
 +++ b/target/linux/ar71xx/files/arch/mips/ath79/mach-cpe510.c
 @@ -236,6 +236,9 @@ MIPS_MACHINE(ATH79_MACH_CPE210, "CPE210", "TP-LINK CPE210/220",
@@ -97,7 +99,7 @@ index ceb1769ddd522d51014228fe65e2662f2f3e627c..16efbc8802ab96a10aab474721902344
  	     cpe210_v2_setup);
  
 +MIPS_MACHINE(ATH79_MACH_CPE210_V3, "CPE210V3", "TP-LINK CPE210 v3",
-+	     cpe210_v2_setup);
++             cpe210_v2_setup);
 +
  MIPS_MACHINE(ATH79_MACH_CPE510, "CPE510", "TP-LINK CPE510/520",
  	     cpe510_setup);
@@ -115,17 +117,22 @@ index 80f6e1d95b7a4e5559e7d5da041b32d962ad4e84..c82cb17cf613bdb3796a15e384215d45
  	ATH79_MACH_CPE510,			/* TP-LINK CPE510 */
  	ATH79_MACH_CPE830,			/* YunCore CPE830 */
 diff --git a/target/linux/ar71xx/image/generic-tp-link.mk b/target/linux/ar71xx/image/generic-tp-link.mk
-index daf6c35ae4610d844bd9e8f44ea5deab72143a48..2a6faa54dbe07d77e6ef6ac0c9dc33186762e36a 100644
+index daf6c35ae4610d844bd9e8f44ea5deab72143a48..8ad1f6e38228b639d1d127937ba875c030a6a632 100644
 --- a/target/linux/ar71xx/image/generic-tp-link.mk
 +++ b/target/linux/ar71xx/image/generic-tp-link.mk
-@@ -195,6 +195,13 @@ define Device/cpe210-v2
+@@ -195,6 +195,18 @@ define Device/cpe210-v2
  endef
  TARGET_DEVICES += cpe210-v2
  
 +define Device/cpe210-v3
-+  $(Device/cpe210-v2)
++  $(Device/cpexxx)
 +  DEVICE_TITLE := TP-LINK CPE210 v3
 +  BOARDNAME := CPE210V3
++  TPLINK_BOARD_ID := CPE210V3
++  KERNEL := kernel-bin | patch-cmdline | lzma | tplink-v1-header
++  TPLINK_HWID := 0x0
++  TPLINK_HWREV := 0
++  TPLINK_HEADER_VERSION := 1
 +endef
 +TARGET_DEVICES += cpe210-v3
 +

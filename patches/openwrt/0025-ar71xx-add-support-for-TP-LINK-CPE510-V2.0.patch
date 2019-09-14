@@ -64,10 +64,10 @@ index a04dd7441d28e9db4dc7c744707bb5f35936da00..faa31e5fd8660cf754164959330aaebf
  	a60|\
  	mr1750|\
 diff --git a/tools/firmware-utils/src/tplink-safeloader.c b/tools/firmware-utils/src/tplink-safeloader.c
-index 01885683c31cd56976df210a2ce54ba85a38fb39..3ecdb1188714e23b04a61865cf089a45978bd73d 100644
+index de15faf6796c993efc6c2a36b22bb1e978e3be90..927b24b6e074c4da2afc55835a5648138c21bd83 100644
 --- a/tools/firmware-utils/src/tplink-safeloader.c
 +++ b/tools/firmware-utils/src/tplink-safeloader.c
-@@ -214,7 +214,17 @@ static struct device_info boards[] = {
+@@ -246,7 +246,17 @@ static struct device_info boards[] = {
  			"CPE510(TP-LINK|EU|N300-5):1.1\r\n"
  			"CPE520(TP-LINK|UN|N300-5):1.1\r\n"
  			"CPE520(TP-LINK|US|N300-5):1.1\r\n"
