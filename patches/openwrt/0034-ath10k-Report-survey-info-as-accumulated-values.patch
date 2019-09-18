@@ -1,0 +1,108 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Wed, 18 Sep 2019 10:01:18 +0200
+Subject: ath10k: Report survey info as accumulated values
+
+diff --git a/package/kernel/mac80211/patches/980-ath10k-Report-survey-info-as-accumulated-values.patch b/package/kernel/mac80211/patches/980-ath10k-Report-survey-info-as-accumulated-values.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..b3ec2fcec4745e97aca143aa9ff211de72920fba
+--- /dev/null
++++ b/package/kernel/mac80211/patches/980-ath10k-Report-survey-info-as-accumulated-values.patch
+@@ -0,0 +1,98 @@
++From 5b708faca52f4d74212efa6746304ac1555128d8 Mon Sep 17 00:00:00 2001
++From: Sven Eckelmann <sven@narfation.org>
++Date: Tue, 17 Sep 2019 15:21:10 +0200
++Subject: [PATCH] ath10k: Report survey info as accumulated values
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++---
++ drivers/net/wireless/ath/ath10k/hw.c  | 13 ++++++++-----
++ drivers/net/wireless/ath/ath10k/wmi.c | 27 +++++++++++++++++----------
++ 2 files changed, 25 insertions(+), 15 deletions(-)
++
++diff --git a/drivers/net/wireless/ath/ath10k/hw.c b/drivers/net/wireless/ath/ath10k/hw.c
++index 675e75d..39dd298 100644
++--- a/drivers/net/wireless/ath/ath10k/hw.c
+++++ b/drivers/net/wireless/ath/ath10k/hw.c
++@@ -187,9 +187,10 @@ void ath10k_hw_fill_survey_time(struct ath10k *ar, struct survey_info *survey,
++ 	u32 cc_fix = 0;
++ 	u32 rcc_fix = 0;
++ 	enum ath10k_hw_cc_wraparound_type wraparound_type;
+++	u32 filled = 0;
++ 
++-	survey->filled |= SURVEY_INFO_TIME |
++-			  SURVEY_INFO_TIME_BUSY;
+++	filled |= SURVEY_INFO_TIME |
+++		  SURVEY_INFO_TIME_BUSY;
++ 
++ 	wraparound_type = ar->hw_params.cc_wraparound_type;
++ 
++@@ -198,7 +199,7 @@ void ath10k_hw_fill_survey_time(struct ath10k *ar, struct survey_info *survey,
++ 		case ATH10K_HW_CC_WRAP_SHIFTED_ALL:
++ 			if (cc < cc_prev) {
++ 				cc_fix = 0x7fffffff;
++-				survey->filled &= ~SURVEY_INFO_TIME_BUSY;
+++				filled &= ~SURVEY_INFO_TIME_BUSY;
++ 			}
++ 			break;
++ 		case ATH10K_HW_CC_WRAP_SHIFTED_EACH:
++@@ -216,8 +217,10 @@ void ath10k_hw_fill_survey_time(struct ath10k *ar, struct survey_info *survey,
++ 	cc -= cc_prev - cc_fix;
++ 	rcc -= rcc_prev - rcc_fix;
++ 
++-	survey->time = CCNT_TO_MSEC(ar, cc);
++-	survey->time_busy = CCNT_TO_MSEC(ar, rcc);
+++	survey->filled |= filled;
+++	survey->time += CCNT_TO_MSEC(ar, cc);
+++	if (survey->filled & SURVEY_INFO_TIME_BUSY)
+++		survey->time_busy += CCNT_TO_MSEC(ar, rcc);
++ }
++ 
++ const struct ath10k_hw_ops qca988x_ops = {
++diff --git a/drivers/net/wireless/ath/ath10k/wmi.c b/drivers/net/wireless/ath/ath10k/wmi.c
++index 5ea8f81..9690a74 100644
++--- a/drivers/net/wireless/ath/ath10k/wmi.c
+++++ b/drivers/net/wireless/ath/ath10k/wmi.c
++@@ -4905,6 +4905,13 @@ static int ath10k_wmi_event_pdev_bss_chan_info(struct ath10k *ar,
++ 		   "wmi event pdev bss chan info:\n freq: %d noise: %d cycle: busy %llu total %llu tx %llu rx %llu rx_bss %llu\n",
++ 		   freq, noise_floor, busy, total, tx, rx, rx_bss);
++ 
+++	/* everything zero means invalid data -> drop it to avoid ruining the
+++	 * noisefloor
+++	 */
+++	if (noise_floor == 0 && busy == 0 && total == 0 && tx == 0 && rx == 0 &&
+++	    rx_bss == 0)
+++		return -EPROTO;
+++
++ 	spin_lock_bh(&ar->data_lock);
++ 	idx = freq_to_idx(ar, freq);
++ 	if (idx >= ARRAY_SIZE(ar->survey)) {
++@@ -4915,16 +4922,16 @@ static int ath10k_wmi_event_pdev_bss_chan_info(struct ath10k *ar,
++ 
++ 	survey = &ar->survey[idx];
++ 
++-	survey->noise     = noise_floor;
++-	survey->time      = div_u64(total, cc_freq_hz);
++-	survey->time_busy = div_u64(busy, cc_freq_hz);
++-	survey->time_rx   = div_u64(rx_bss, cc_freq_hz);
++-	survey->time_tx   = div_u64(tx, cc_freq_hz);
++-	survey->filled   |= (SURVEY_INFO_NOISE_DBM |
++-			     SURVEY_INFO_TIME |
++-			     SURVEY_INFO_TIME_BUSY |
++-			     SURVEY_INFO_TIME_RX |
++-			     SURVEY_INFO_TIME_TX);
+++	survey->noise      = noise_floor;
+++	survey->time      += div_u64(total, cc_freq_hz);
+++	survey->time_busy += div_u64(busy, cc_freq_hz);
+++	survey->time_rx   += div_u64(rx_bss, cc_freq_hz);
+++	survey->time_tx   += div_u64(tx, cc_freq_hz);
+++	survey->filled    |= (SURVEY_INFO_NOISE_DBM |
+++			      SURVEY_INFO_TIME |
+++			      SURVEY_INFO_TIME_BUSY |
+++			      SURVEY_INFO_TIME_RX |
+++			      SURVEY_INFO_TIME_TX);
++ exit:
++ 	spin_unlock_bh(&ar->data_lock);
++ 	complete(&ar->bss_survey_done);
++-- 
++2.20.1
++
