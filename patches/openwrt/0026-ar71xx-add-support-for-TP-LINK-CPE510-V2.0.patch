@@ -11,10 +11,10 @@ Signed-off-by: Andrew Cameron <apcameron@softhome.net>
 Origin: backport, https://git.openwrt.org/?p=openwrt/openwrt.git;a=commit;h=bae927c551fdd91fbc8343071e4b5c44f73eee0d
 
 diff --git a/target/linux/ar71xx/base-files/lib/ar71xx.sh b/target/linux/ar71xx/base-files/lib/ar71xx.sh
-index 2200069c647b33220126e797b6a61928d1fb428e..6794a442ea57137a76f03a43b9a4f5832a391c3f 100755
+index 7e96ab2b2a0b026ac063cc0f30ab8f4bbef28b1e..1a833f07a2bd31eb0e8003a2e961795619c7dbb2 100755
 --- a/target/linux/ar71xx/base-files/lib/ar71xx.sh
 +++ b/target/linux/ar71xx/base-files/lib/ar71xx.sh
-@@ -592,7 +592,14 @@ ar71xx_board_detect() {
+@@ -738,7 +738,14 @@ ar71xx_board_detect() {
  		;;
  	*"CPE510/520")
  		name="cpe510"
@@ -31,7 +31,7 @@ index 2200069c647b33220126e797b6a61928d1fb428e..6794a442ea57137a76f03a43b9a4f583
  	*"CPE830")
  		name="cpe830"
 diff --git a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
-index a04dd7441d28e9db4dc7c744707bb5f35936da00..faa31e5fd8660cf754164959330aaebfeb205eac 100755
+index f7bb7dbbcd2606cdcbf2c76aa30a96831a232617..a8848b7bc84004f975cfb90e150a29fce1ce7519 100755
 --- a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
 +++ b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
 @@ -580,7 +580,6 @@ platform_check_image() {

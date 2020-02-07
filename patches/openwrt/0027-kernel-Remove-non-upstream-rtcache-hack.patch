@@ -77,7 +77,7 @@ crash (input == NULL):
 
 diff --git a/target/linux/generic/backport-4.14/020-backport_netfilter_rtcache.patch b/target/linux/generic/backport-4.14/020-backport_netfilter_rtcache.patch
 deleted file mode 100644
-index 8a6fba4307c2f7f7384f7274f39cf54c1a0ea7ae..0000000000000000000000000000000000000000
+index 88e5386c1f4a1f05e88c40ae72d3dd87552e2083..0000000000000000000000000000000000000000
 --- a/target/linux/generic/backport-4.14/020-backport_netfilter_rtcache.patch
 +++ /dev/null
 @@ -1,558 +0,0 @@
@@ -527,6 +527,11 @@ index 8a6fba4307c2f7f7384f7274f39cf54c1a0ea7ae..00000000000000000000000000000000
 -+	.destroy = nf_conn_rtcache_destroy,
 -+};
 -+
+-+static int __net_init rtcache_net_init(struct net *net)
+-+{
+-+	return nf_register_net_hooks(net, rtcache_ops, ARRAY_SIZE(rtcache_ops));
+-+}
+-+
 -+static void __net_exit rtcache_net_exit(struct net *net)
 -+{
 -+	/* remove hooks so no new connections get rtcache extension */
@@ -534,6 +539,7 @@ index 8a6fba4307c2f7f7384f7274f39cf54c1a0ea7ae..00000000000000000000000000000000
 -+}
 -+
 -+static struct pernet_operations rtcache_ops_net_ops = {
+-+	.init	= rtcache_net_init,
 -+	.exit	= rtcache_net_exit,
 -+};
 -+
@@ -552,18 +558,8 @@ index 8a6fba4307c2f7f7384f7274f39cf54c1a0ea7ae..00000000000000000000000000000000
 -+		return ret;
 -+	}
 -+
--+	ret = nf_register_net_hooks(&init_net, rtcache_ops,
--+				    ARRAY_SIZE(rtcache_ops));
--+	if (ret < 0) {
--+		nf_ct_extend_unregister(&rtcache_extend);
--+		unregister_pernet_subsys(&rtcache_ops_net_ops);
--+		return ret;
--+	}
--+
 -+	ret = register_netdevice_notifier(&nf_rtcache_notifier);
 -+	if (ret) {
--+		nf_unregister_net_hooks(&init_net, rtcache_ops,
--+					ARRAY_SIZE(rtcache_ops));
 -+		nf_ct_extend_unregister(&rtcache_extend);
 -+		unregister_pernet_subsys(&rtcache_ops_net_ops);
 -+	}
@@ -614,6 +610,9 @@ index 8a6fba4307c2f7f7384f7274f39cf54c1a0ea7ae..00000000000000000000000000000000
 -+	synchronize_net();
 -+
 -+	unregister_netdevice_notifier(&nf_rtcache_notifier);
+-+	unregister_pernet_subsys(&rtcache_ops_net_ops);
+-+
+-+	synchronize_net();
 -+
 -+	rtnl_lock();
 -+
@@ -630,6 +629,7 @@ index 8a6fba4307c2f7f7384f7274f39cf54c1a0ea7ae..00000000000000000000000000000000
 -+	}
 -+
 -+	rtnl_unlock();
+-+
 -+	synchronize_net();
 -+	nf_ct_extend_unregister(&rtcache_extend);
 -+}

@@ -22,7 +22,7 @@ index 0000000000000000000000000000000000000000..27cc60fcb49472698d13380653117ea7
 + 	netdev_set_priv_destructor(dev, ieee80211_if_free);
 diff --git a/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch b/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch
 deleted file mode 100644
-index d1e92ae40af4cb12a66a4d063833396ddf2b374e..0000000000000000000000000000000000000000
+index cf03b00f8210355fbfde450f552495e42ed806af..0000000000000000000000000000000000000000
 --- a/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch
 +++ /dev/null
 @@ -1,94 +0,0 @@
@@ -42,7 +42,7 @@ index d1e92ae40af4cb12a66a4d063833396ddf2b374e..00000000000000000000000000000000
 -
 ---- a/include/net/sch_generic.h
 -+++ b/include/net/sch_generic.h
--@@ -368,12 +368,13 @@ extern struct Qdisc_ops noop_qdisc_ops;
+-@@ -373,12 +373,13 @@ extern struct Qdisc_ops noop_qdisc_ops;
 - extern struct Qdisc_ops pfifo_fast_ops;
 - extern struct Qdisc_ops mq_qdisc_ops;
 - extern struct Qdisc_ops noqueue_qdisc_ops;
@@ -72,7 +72,7 @@ index d1e92ae40af4cb12a66a4d063833396ddf2b374e..00000000000000000000000000000000
 - 	  device, it has to decide which ones to send first, which ones to
 ---- a/net/sched/sch_api.c
 -+++ b/net/sched/sch_api.c
--@@ -2028,7 +2028,7 @@ static int __init pktsched_init(void)
+-@@ -2031,7 +2031,7 @@ static int __init pktsched_init(void)
 - 		return err;
 - 	}
 - 
@@ -111,7 +111,7 @@ index d1e92ae40af4cb12a66a4d063833396ddf2b374e..00000000000000000000000000000000
 - EXPORT_SYMBOL(default_qdisc_ops);
 - 
 - /* Main transmission queue. */
--@@ -760,7 +760,7 @@ static void attach_one_default_qdisc(str
+-@@ -764,7 +764,7 @@ static void attach_one_default_qdisc(str
 - 				     void *_unused)
 - {
 - 	struct Qdisc *qdisc;
@@ -287,7 +287,7 @@ index 7b6e38da2934239e012ad3594c892b807c3a2e67..00000000000000000000000000000000
 - 
 diff --git a/target/linux/generic/hack-4.9/661-use_fq_codel_by_default.patch b/target/linux/generic/hack-4.9/661-use_fq_codel_by_default.patch
 deleted file mode 100644
-index 34fc2a37c3f19c0f982a1c9a3ae0c047a3ce60da..0000000000000000000000000000000000000000
+index 22d5a3893a685bd836213953061b0da43a455352..0000000000000000000000000000000000000000
 --- a/target/linux/generic/hack-4.9/661-use_fq_codel_by_default.patch
 +++ /dev/null
 @@ -1,94 +0,0 @@
@@ -307,7 +307,7 @@ index 34fc2a37c3f19c0f982a1c9a3ae0c047a3ce60da..00000000000000000000000000000000
 -
 ---- a/include/net/sch_generic.h
 -+++ b/include/net/sch_generic.h
--@@ -339,12 +339,13 @@ extern struct Qdisc_ops noop_qdisc_ops;
+-@@ -344,12 +344,13 @@ extern struct Qdisc_ops noop_qdisc_ops;
 - extern struct Qdisc_ops pfifo_fast_ops;
 - extern struct Qdisc_ops mq_qdisc_ops;
 - extern struct Qdisc_ops noqueue_qdisc_ops;
@@ -376,7 +376,7 @@ index 34fc2a37c3f19c0f982a1c9a3ae0c047a3ce60da..00000000000000000000000000000000
 - EXPORT_SYMBOL(default_qdisc_ops);
 - 
 - /* Main transmission queue. */
--@@ -760,7 +760,7 @@ static void attach_one_default_qdisc(str
+-@@ -764,7 +764,7 @@ static void attach_one_default_qdisc(str
 - 				     void *_unused)
 - {
 - 	struct Qdisc *qdisc;
