@@ -1,0 +1,106 @@
+From: Dark4MD <github.web@manu.li>
+Date: Fri, 22 Feb 2019 22:45:24 +0100
+Subject: added TP-Link TL-WR841ND/N Devices for 8M and 16M Variants
+
+diff --git a/target/linux/ar71xx/base-files/lib/ar71xx.sh b/target/linux/ar71xx/base-files/lib/ar71xx.sh
+index 044ef4eae5e1cd2f04bacc5b0c18a151f2fe1253..a429f173c4e21d40ad603a4854df04ea6f716203 100755
+--- a/target/linux/ar71xx/base-files/lib/ar71xx.sh
++++ b/target/linux/ar71xx/base-files/lib/ar71xx.sh
+@@ -258,6 +258,12 @@ tplink_board_detect() {
+ 
+ 		[ "$hwid" = '08410002' -a "$mid" = '00000002' ] && hwver=' v1.5'
+ 		;;
++	"084108"*)
++		model="TP-Link TL-WR841N/ND Mod (8M)"
++		;;
++	"084116"*)
++		model="TP-Link TL-WR841N/ND Mod (16M)"
++		;;
+ 	"084200"*)
+ 		model="TP-Link TL-WR842N/ND"
+ 		;;
+diff --git a/target/linux/ar71xx/image/generic-tp-link.mk b/target/linux/ar71xx/image/generic-tp-link.mk
+old mode 100644
+new mode 100755
+index 0f3f731d17f722cf4ad9e73b8347ab2152e9a27e..4ba9284b3d6a574ebecaecf74e71d39b3f57758e
+--- a/target/linux/ar71xx/image/generic-tp-link.mk
++++ b/target/linux/ar71xx/image/generic-tp-link.mk
+@@ -542,3 +542,77 @@ define Device/tl-wr942n-v1
+   SUPPORTED_DEVICES := tl-wr942n-v1
+ endef
+ TARGET_DEVICES += tl-wr942n-v1
++
++define Device/tl-wr841-v8-8m
++  $(Device/tplink-8mlzma)
++  DEVICE_TITLE := TP-LINK TL-WR841N/ND Mod (8M) v8
++  BOARDNAME := TL-WR841N-v8
++  DEVICE_PROFILE := TLWR8418M
++  TPLINK_HWID := 0x08410808
++endef
++TARGET_DEVICES += tl-wr841-v8-8m
++
++define Device/tl-wr841-v9-8m
++  $(Device/tplink-8mlzma)
++  DEVICE_TITLE := TP-LINK TL-WR841N/ND Mod (8M) v9
++  BOARDNAME := TL-WR841N-v9
++  DEVICE_PROFILE := TLWR8418M
++  TPLINK_HWID := 0x08410809
++endef
++TARGET_DEVICES += tl-wr841-v9-8m
++
++define Device/tl-wr841-v10-8m
++  $(Device/tl-wr841-v9-8m)
++  DEVICE_TITLE := TP-LINK TL-WR841N/ND Mod (8M) v10
++  TPLINK_HWID := 0x08410810
++endef
++TARGET_DEVICES += tl-wr841-v10-8m
++
++define Device/tl-wr841-v11-8m
++  $(Device/tplink-8mlzma)
++  DEVICE_TITLE := TP-LINK TL-WR841N/ND Mod (8M) v11
++  BOARDNAME := TL-WR841N-v11
++  DEVICE_PROFILE := TLWR8418M
++  TPLINK_HWID := 0x08410811
++  IMAGES += factory-us.bin factory-eu.bin
++  IMAGE/factory-us.bin := append-rootfs | mktplinkfw factory -C US
++  IMAGE/factory-eu.bin := append-rootfs | mktplinkfw factory -C EU
++endef
++TARGET_DEVICES += tl-wr841-v11-8m
++
++define Device/tl-wr841-v8-16m
++  $(Device/tplink-16mlzma)
++  DEVICE_TITLE := TP-LINK TL-WR841N/ND Mod (16M) v8
++  BOARDNAME := TL-WR841N-v8
++  DEVICE_PROFILE := TLWR84116M
++  TPLINK_HWID := 0x08411608
++endef
++TARGET_DEVICES += tl-wr841-v8-16m
++
++define Device/tl-wr841-v9-16m
++  $(Device/tplink-16mlzma)
++  DEVICE_TITLE := TP-LINK TL-WR841N/ND Mod (16M) v9
++  BOARDNAME := TL-WR841N-v9
++  DEVICE_PROFILE := TLWR84116M
++  TPLINK_HWID := 0x08411609
++endef
++TARGET_DEVICES += tl-wr841-v9-16m
++
++define Device/tl-wr841-v10-16m
++  $(Device/tl-wr841-v9-16m)
++  DEVICE_TITLE := TP-LINK TL-WR841N/ND Mod (16M) v10
++  TPLINK_HWID := 0x08411610
++endef
++TARGET_DEVICES += tl-wr841-v10-16m
++
++define Device/tl-wr841-v11-16m
++  $(Device/tplink-16mlzma)
++  DEVICE_TITLE := TP-LINK TL-WR841N/ND Mod (16M) v11
++  BOARDNAME := TL-WR841N-v11
++  DEVICE_PROFILE := TLWR84116M
++  TPLINK_HWID := 0x08411611
++  IMAGES += factory-us.bin factory-eu.bin
++  IMAGE/factory-us.bin := append-rootfs | mktplinkfw factory -C US
++  IMAGE/factory-eu.bin := append-rootfs | mktplinkfw factory -C EU
++endef
++TARGET_DEVICES += tl-wr841-v11-16m
+\ No newline at end of file
