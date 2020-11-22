@@ -76,6 +76,7 @@ ar71xx-generic
 * Plasma Cloud
 
   - PA1200
+  - PA2200
 
 * TP-Link
 
