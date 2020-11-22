@@ -73,6 +73,10 @@ ar71xx-generic
   - OM5P-AN
   - OM5P-AC (v1, v2)
 
+* Plasma Cloud
+
+  - PA1200
+
 * TP-Link
 
   - Archer C5 (v1)
