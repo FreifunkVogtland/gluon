@@ -125,6 +125,9 @@ local primary_addrs = {
 			'om2pv4',
 			'om2p-hsv4',
 		}},
+		{'ath79', 'generic', {
+			'plasmacloud,pa300',
+		}},
 		{'ipq40xx', 'generic', {
 			'linksys,ea6350v3',
 			'openmesh,a42',

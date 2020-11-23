@@ -71,6 +71,10 @@ device('ocedo-raccoon', 'ocedo_raccoon', {
 	factory = false,
 })
 
+-- Plasma Cloud
+
+device('plasma-cloud-pa300', 'plasmacloud_pa300')
+
 -- TP-Link
 
 device('tp-link-archer-c6-v2', 'tplink_archer-c6-v2', {

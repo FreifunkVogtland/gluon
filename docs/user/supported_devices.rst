@@ -207,6 +207,10 @@ ath79-generic
 
   - Raccoon
 
+* Plasma Cloud
+
+  - PA300
+
 * TP-Link
 
   - Archer C6 (v2)
