@@ -127,6 +127,7 @@ local primary_addrs = {
 		}},
 		{'ath79', 'generic', {
 			'plasmacloud,pa300',
+			'plasmacloud,pa300e',
 		}},
 		{'ipq40xx', 'generic', {
 			'linksys,ea6350v3',
