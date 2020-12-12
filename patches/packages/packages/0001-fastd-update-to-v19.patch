@@ -26,7 +26,7 @@ index 3350eb3099a26c870d70373c0712a8b59881ee5c..e6440075e561093c86543943cb982d01
  config FASTD_ENABLE_CIPHER_NULL
  	bool "Enable the null cipher"
 diff --git a/net/fastd/Makefile b/net/fastd/Makefile
-index 44b37b6ca300ba43f15d7a116fb654ccd0a69e99..8eabc34db6f3b906ddb1b5df5c232309e85d2ffb 100644
+index f4890b56931a75849229d25fe78720e19d493383..7483e7b003041fb59991d72d0ccfcc8a28bb17a3 100644
 --- a/net/fastd/Makefile
 +++ b/net/fastd/Makefile
 @@ -8,13 +8,13 @@
@@ -34,9 +34,9 @@ index 44b37b6ca300ba43f15d7a116fb654ccd0a69e99..8eabc34db6f3b906ddb1b5df5c232309
  
  PKG_NAME:=fastd
 -PKG_VERSION:=18
--PKG_RELEASE:=4
+-PKG_RELEASE:=5
 +PKG_VERSION:=19
-+PKG_RELEASE:=1
++PKG_RELEASE:=2
  
  PKG_MAINTAINER:=Matthias Schiffer <mschiffer@universe-factory.net>
  PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
