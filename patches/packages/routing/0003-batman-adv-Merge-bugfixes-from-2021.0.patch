@@ -1,0 +1,216 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sat, 12 Dec 2020 13:54:51 +0100
+Subject: batman-adv: Merge bugfixes from 2021.0
+
+* set .owner to THIS_MODULE
+* Consider fragmentation for needed_headroom
+* Reserve needed_*room for fragments
+* Don't always reallocate the fragmentation skb head
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batman-adv/patches/0030-batman-adv-set-.owner-to-THIS_MODULE.patch b/batman-adv/patches/0030-batman-adv-set-.owner-to-THIS_MODULE.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e7374493d7c42081668c10eb9be9f87b8107e7f2
+--- /dev/null
++++ b/batman-adv/patches/0030-batman-adv-set-.owner-to-THIS_MODULE.patch
+@@ -0,0 +1,26 @@
++From: Taehee Yoo <ap420073@gmail.com>
++Date: Sun, 15 Nov 2020 10:30:04 +0000
++Subject: batman-adv: set .owner to THIS_MODULE
++
++If THIS_MODULE is not set, the module would be removed while debugfs is
++being used.
++It eventually makes kernel panic.
++
++Fixes: 24571be14371 ("batman-adv: add routing debug log accessible via debugfs")
++Signed-off-by: Taehee Yoo <ap420073@gmail.com>
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/6e2937539a2c9f8a8536515258bc1f08bed19a06
++
++diff --git a/net/batman-adv/log.c b/net/batman-adv/log.c
++index 60ce11e16a905e790424a2d7aca81c1f945c1ec2..a51fadeaefb58e75a84820998390acd3759ef3a8 100644
++--- a/net/batman-adv/log.c
+++++ b/net/batman-adv/log.c
++@@ -180,6 +180,7 @@ static const struct file_operations batadv_log_fops = {
++ 	.read           = batadv_log_read,
++ 	.poll           = batadv_log_poll,
++ 	.llseek         = no_llseek,
+++	.owner          = THIS_MODULE,
++ };
++ 
++ /**
+diff --git a/batman-adv/patches/0031-batman-adv-Consider-fragmentation-for-needed_headroo.patch b/batman-adv/patches/0031-batman-adv-Consider-fragmentation-for-needed_headroo.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..cea7549bb4efa5a01113e039bb52b5f67f7fd1be
+--- /dev/null
++++ b/batman-adv/patches/0031-batman-adv-Consider-fragmentation-for-needed_headroo.patch
+@@ -0,0 +1,31 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Thu, 26 Nov 2020 18:15:06 +0100
++Subject: batman-adv: Consider fragmentation for needed_headroom
++
++If a batman-adv packets has to be fragmented, then the original batman-adv
++packet header is not stripped away. Instead, only a new header is added in
++front of the packet after it was split.
++
++This size must be considered to avoid cost intensive reallocations during
++the transmission through the various device layers.
++
++Fixes: e2b4301f4e2d ("batman-adv: Add lower layer needed_(head|tail)room to own ones")
++Reported-by: Linus Lüssing <linus.luessing@c0d3.blue>
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/92064deda9b063ca2d5a53b307c6127a9453357c
++
++diff --git a/net/batman-adv/hard-interface.c b/net/batman-adv/hard-interface.c
++index 62b926dd4aaeffd82da83654c8e568de2c3714fb..e0f70ae28df4e2fb0a7972a1ca9d5fcc986c0d6c 100644
++--- a/net/batman-adv/hard-interface.c
+++++ b/net/batman-adv/hard-interface.c
++@@ -553,6 +553,9 @@ static void batadv_hardif_recalc_extra_skbroom(struct net_device *soft_iface)
++ 	needed_headroom = lower_headroom + (lower_header_len - ETH_HLEN);
++ 	needed_headroom += batadv_max_header_len();
++ 
+++	/* fragmentation headers don't strip the unicast/... header */
+++	needed_headroom += sizeof(struct batadv_frag_packet);
+++
++ 	soft_iface->needed_headroom = needed_headroom;
++ 	soft_iface->needed_tailroom = lower_tailroom;
++ }
+diff --git a/batman-adv/patches/0032-batman-adv-Reserve-needed_-room-for-fragments.patch b/batman-adv/patches/0032-batman-adv-Reserve-needed_-room-for-fragments.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..a27355ff4d2e58b2dddcdc50adf6e696e17c7f1b
+--- /dev/null
++++ b/batman-adv/patches/0032-batman-adv-Reserve-needed_-room-for-fragments.patch
+@@ -0,0 +1,82 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Wed, 25 Nov 2020 13:16:43 +0100
++Subject: batman-adv: Reserve needed_*room for fragments
++
++The batadv net_device is trying to propagate the needed_headroom and
++needed_tailroom from the lower devices. This is needed to avoid cost
++intensive reallocations using pskb_expand_head during the transmission.
++
++But the fragmentation code split the skb's without adding extra room at the
++end/beginning of the various fragments. This reduced the performance of
++transmissions over complex scenarios (batadv on vxlan on wireguard) because
++the lower devices had to perform the reallocations at least once.
++
++Fixes: db56e4ecf5c2 ("batman-adv: Fragment and send skbs larger than mtu")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/0966d5424bb87e863037301488519ccdd69e4d26
++
++diff --git a/net/batman-adv/fragmentation.c b/net/batman-adv/fragmentation.c
++index 385fccdcf69d05d63f59d024dfb721b1e8f1c8b9..f1d202ff396cd69949915a9e90e763f3a68255b7 100644
++--- a/net/batman-adv/fragmentation.c
+++++ b/net/batman-adv/fragmentation.c
++@@ -391,6 +391,7 @@ bool batadv_frag_skb_fwd(struct sk_buff *skb,
++ 
++ /**
++  * batadv_frag_create() - create a fragment from skb
+++ * @net_dev: outgoing device for fragment
++  * @skb: skb to create fragment from
++  * @frag_head: header to use in new fragment
++  * @fragment_size: size of new fragment
++@@ -401,22 +402,25 @@ bool batadv_frag_skb_fwd(struct sk_buff *skb,
++  *
++  * Return: the new fragment, NULL on error.
++  */
++-static struct sk_buff *batadv_frag_create(struct sk_buff *skb,
+++static struct sk_buff *batadv_frag_create(struct net_device *net_dev,
+++					  struct sk_buff *skb,
++ 					  struct batadv_frag_packet *frag_head,
++ 					  unsigned int fragment_size)
++ {
+++	unsigned int ll_reserved = LL_RESERVED_SPACE(net_dev);
+++	unsigned int tailroom = net_dev->needed_tailroom;
++ 	struct sk_buff *skb_fragment;
++ 	unsigned int header_size = sizeof(*frag_head);
++ 	unsigned int mtu = fragment_size + header_size;
++ 
++-	skb_fragment = netdev_alloc_skb(NULL, mtu + ETH_HLEN);
+++	skb_fragment = dev_alloc_skb(ll_reserved + mtu + tailroom);
++ 	if (!skb_fragment)
++ 		goto err;
++ 
++ 	skb_fragment->priority = skb->priority;
++ 
++ 	/* Eat the last mtu-bytes of the skb */
++-	skb_reserve(skb_fragment, header_size + ETH_HLEN);
+++	skb_reserve(skb_fragment, ll_reserved + header_size);
++ 	skb_split(skb, skb_fragment, skb->len - fragment_size);
++ 
++ 	/* Add the header */
++@@ -439,11 +443,12 @@ int batadv_frag_send_packet(struct sk_buff *skb,
++ 			    struct batadv_orig_node *orig_node,
++ 			    struct batadv_neigh_node *neigh_node)
++ {
+++	struct net_device *net_dev = neigh_node->if_incoming->net_dev;
++ 	struct batadv_priv *bat_priv;
++ 	struct batadv_hard_iface *primary_if = NULL;
++ 	struct batadv_frag_packet frag_header;
++ 	struct sk_buff *skb_fragment;
++-	unsigned int mtu = neigh_node->if_incoming->net_dev->mtu;
+++	unsigned int mtu = net_dev->mtu;
++ 	unsigned int header_size = sizeof(frag_header);
++ 	unsigned int max_fragment_size, num_fragments;
++ 	int ret;
++@@ -503,7 +508,7 @@ int batadv_frag_send_packet(struct sk_buff *skb,
++ 			goto put_primary_if;
++ 		}
++ 
++-		skb_fragment = batadv_frag_create(skb, &frag_header,
+++		skb_fragment = batadv_frag_create(net_dev, skb, &frag_header,
++ 						  max_fragment_size);
++ 		if (!skb_fragment) {
++ 			ret = -ENOMEM;
+diff --git a/batman-adv/patches/0033-batman-adv-Don-t-always-reallocate-the-fragmentation.patch b/batman-adv/patches/0033-batman-adv-Don-t-always-reallocate-the-fragmentation.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..ccaf19b7c360172b0b687db8281e4cf6331335f4
+--- /dev/null
++++ b/batman-adv/patches/0033-batman-adv-Don-t-always-reallocate-the-fragmentation.patch
+@@ -0,0 +1,42 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Thu, 26 Nov 2020 18:24:49 +0100
++Subject: batman-adv: Don't always reallocate the fragmentation skb head
++
++When a packet is fragmented by batman-adv, the original batman-adv header
++is not modified. Only a new fragmentation is inserted between the original
++one and the ethernet header. The code must therefore make sure that it has
++a writable region of this size in the skbuff head.
++
++But it is not useful to always reallocate the skbuff by this size even when
++there would be more than enough headroom still in the skb. The reallocation
++is just to costly during in this codepath.
++
++Fixes: db56e4ecf5c2 ("batman-adv: Fragment and send skbs larger than mtu")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++Origin: upstream, https://git.open-mesh.org/batman-adv.git/commit/3e3ff987876d3be70d928561acbefe5a48ab1654
++
++diff --git a/net/batman-adv/fragmentation.c b/net/batman-adv/fragmentation.c
++index f1d202ff396cd69949915a9e90e763f3a68255b7..0da90e73c79bffe86072f0d704f0777d76b35f4c 100644
++--- a/net/batman-adv/fragmentation.c
+++++ b/net/batman-adv/fragmentation.c
++@@ -527,13 +527,14 @@ int batadv_frag_send_packet(struct sk_buff *skb,
++ 		frag_header.no++;
++ 	}
++ 
++-	/* Make room for the fragment header. */
++-	if (batadv_skb_head_push(skb, header_size) < 0 ||
++-	    pskb_expand_head(skb, header_size + ETH_HLEN, 0, GFP_ATOMIC) < 0) {
++-		ret = -ENOMEM;
+++	/* make sure that there is at least enough head for the fragmentation
+++	 * and ethernet headers
+++	 */
+++	ret = skb_cow_head(skb, ETH_HLEN + header_size);
+++	if (ret < 0)
++ 		goto put_primary_if;
++-	}
++ 
+++	skb_push(skb, header_size);
++ 	memcpy(skb->data, &frag_header, header_size);
++ 
++ 	/* Send the last fragment */
