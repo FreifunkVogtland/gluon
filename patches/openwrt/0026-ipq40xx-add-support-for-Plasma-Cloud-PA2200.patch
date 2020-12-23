@@ -77,6 +77,117 @@ index 5e181f67437ec644d07d8fc4882908549d3d60ef..6e0d840de247f3ee6e8f9a097a8649a8
  $(eval $(call generate-ipq-wifi-package,qxwlan_e2600ac,Qxwlan E2600AC))
  
  $(foreach PACKAGE,$(ALLWIFIPACKAGES),$(eval $(call BuildPackage,$(PACKAGE))))
+diff --git a/package/firmware/ipq-wifi/board-plasmacloud_pa2200.qca4019 b/package/firmware/ipq-wifi/board-plasmacloud_pa2200.qca4019
+new file mode 100644
+index 0000000000000000000000000000000000000000..d1db0f5f4b8b734c0c43df38d9eedb0b84f72109
+GIT binary patch
+literal 24324
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/package/firmware/ipq-wifi/board-plasmacloud_pa2200.qca9888 b/package/firmware/ipq-wifi/board-plasmacloud_pa2200.qca9888
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c3f083eb20775cf2a322aa5694c8a3e717ec71c
+GIT binary patch
+literal 12172
+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
+
+literal 0
+HcmV?d00001
+
 diff --git a/scripts/om-fwupgradecfg-gen.sh b/scripts/om-fwupgradecfg-gen.sh
 index a5cb99d834a04163485ade53247ba2556ad7d31f..bc63bfe280dba5d1e61cddbdff919db0146733ee 100755
 --- a/scripts/om-fwupgradecfg-gen.sh

@@ -73,6 +73,72 @@ index cc0505b97c6a04bafd88972cf6ce7890a637c33b..5e181f67437ec644d07d8fc488290854
  $(eval $(call generate-ipq-wifi-package,qxwlan_e2600ac,Qxwlan E2600AC))
  
  $(foreach PACKAGE,$(ALLWIFIPACKAGES),$(eval $(call BuildPackage,$(PACKAGE))))
+diff --git a/package/firmware/ipq-wifi/board-plasmacloud_pa1200.qca4019 b/package/firmware/ipq-wifi/board-plasmacloud_pa1200.qca4019
+new file mode 100644
+index 0000000000000000000000000000000000000000..99d6df8c8c2bd6ed8058b290e00aef09d74dbfb8
+GIT binary patch
+literal 24324
+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
+
+literal 0
+HcmV?d00001
+
 diff --git a/scripts/om-fwupgradecfg-gen.sh b/scripts/om-fwupgradecfg-gen.sh
 index 4a7094055ff67aab83e796fc30f9913ae2c30fe2..a5cb99d834a04163485ade53247ba2556ad7d31f 100755
 --- a/scripts/om-fwupgradecfg-gen.sh
