@@ -101,7 +101,7 @@ index 0000000000000000000000000000000000000000..1527a796bb63b7c33b60caaeb9743893
 +	model = "Plasma Cloud PA300E";
 +};
 diff --git a/target/linux/ath79/image/generic.mk b/target/linux/ath79/image/generic.mk
-index 7f35f24dfbfaefffb16c32bc3baeeea55a84a370..c25cc4b2e78724c440544e86a11433e5eadb92d1 100644
+index 85f9d7cbf5eda22c18af45608ec6539f12fb2285..2e6f06b8a30d3bc0fdd89a3a11fce81ed646776e 100644
 --- a/target/linux/ath79/image/generic.mk
 +++ b/target/linux/ath79/image/generic.mk
 @@ -659,6 +659,19 @@ define Device/plasmacloud_pa300
@@ -117,7 +117,7 @@ index 7f35f24dfbfaefffb16c32bc3baeeea55a84a370..c25cc4b2e78724c440544e86a11433e5
 +  IMAGES += factory.bin
 +  KERNEL := kernel-bin | append-dtb | lzma | uImage lzma | pad-to $$(BLOCKSIZE)
 +  IMAGE/factory.bin := append-rootfs | pad-rootfs | openmesh-image ce_type=PA300
-+  IMAGE/sysupgrade.bin/squashfs := append-rootfs | pad-rootfs | sysupgrade-tar rootfs=$$$$@ | append-metadata
++  IMAGE/sysupgrade.bin := append-rootfs | pad-rootfs | sysupgrade-tar rootfs=$$$$@ | append-metadata
 +endef
 +TARGET_DEVICES += plasmacloud_pa300e
 +
