@@ -224,14 +224,51 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + 
 diff --git a/package/kernel/mac80211/patches/ath/952-ath9k-work-around-deadbeef-wifi-chip-hang.patch b/package/kernel/mac80211/patches/ath/952-ath9k-work-around-deadbeef-wifi-chip-hang.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..1a4f4a1ddbce5db08273bab123efbd068c1bd45f
+index 0000000000000000000000000000000000000000..b35eb842b75eb4f97d1f10e13caad3cb7c0d846a
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/ath/952-ath9k-work-around-deadbeef-wifi-chip-hang.patch
-@@ -0,0 +1,56 @@
-+From: Sven Eckelmann <sven@narfation.org>
-+Date: Thu, 23 Apr 2020 18:45:15 +0200
-+Subject: ath9k: work around deadbeef wifi chip hang
+@@ -0,0 +1,142 @@
++From: Simon Wunderlich <simon.wunderlich@open-mesh.com>
++Date: Thu, 17 Nov 2016 09:36:13 +0100
++Subject: ath9k: work around AR_CFG 0xdeadbeef chip hang
 +
++QCA 802.11n chips (especially AR9330/AR9340) sometimes end up in a state in
++which a read of AR_CFG always returns 0xdeadbeef. This should not happen
++when when the power_mode of the device is ATH9K_PM_AWAKE.
++
++This problem is not yet detected by any other workaround in ath9k. No way
++is known to reproduce the problem easily.
++
++Signed-off-by: Simon Wunderlich <simon.wunderlich@open-mesh.com>
++[sven.eckelmann@open-mesh.com: port to recent ath9k, add commit message]
++Signed-off-by: Sven Eckelmann <sven.eckelmann@open-mesh.com>
++
++diff --git a/drivers/net/wireless/ath/ath9k/ath9k.h b/drivers/net/wireless/ath/ath9k/ath9k.h
++index e38065b2e79f3df92c4679c310a1de871134460f..7fb33b64ec7e24be444c59b22af0b5f526ddfc67 100644
++--- a/drivers/net/wireless/ath/ath9k/ath9k.h
+++++ b/drivers/net/wireless/ath/ath9k/ath9k.h
++@@ -746,11 +746,13 @@ void ath9k_csa_update(struct ath_softc *sc);
++ #define ATH_ANI_MAX_SKIP_COUNT    10
++ #define ATH_PAPRD_TIMEOUT         100 /* msecs */
++ #define ATH_PLL_WORK_INTERVAL     100
+++#define ATH_HANG_WORK_INTERVAL    30000
++ 
++ void ath_tx_complete_poll_work(struct work_struct *work);
++ void ath_reset_work(struct work_struct *work);
++ bool ath_hw_check(struct ath_softc *sc);
++ void ath_hw_pll_work(struct work_struct *work);
+++void ath_hw_hang_work(struct work_struct *work);
++ void ath_paprd_calibrate(struct work_struct *work);
++ void ath_ani_calibrate(struct timer_list *t);
++ void ath_start_ani(struct ath_softc *sc);
++@@ -1082,6 +1084,7 @@ struct ath_softc {
++ #endif
++ 	struct delayed_work tx_complete_work;
++ 	struct delayed_work hw_pll_work;
+++	struct delayed_work hw_hang_work;
++ 	struct timer_list sleep_timer;
++ 
++ #ifdef CPTCFG_ATH9K_BTCOEX_SUPPORT
 +diff --git a/drivers/net/wireless/ath/ath9k/debug.c b/drivers/net/wireless/ath/ath9k/debug.c
 +index f20364bd20273acc0023394ca55a00b35407494c..1aeabb58dc022127ba1857262b82f52403c8e4ac 100644
 +--- a/drivers/net/wireless/ath/ath9k/debug.c
@@ -256,31 +293,80 @@ index 0000000000000000000000000000000000000000..1a4f4a1ddbce5db08273bab123efbd06
 + 	__RESET_TYPE_MAX
 + };
 + 
++diff --git a/drivers/net/wireless/ath/ath9k/init.c b/drivers/net/wireless/ath/ath9k/init.c
++index 67b4457d0019325ca4919e96d5a5820b357cd9cc..de1c6ba12390c307e28af3ac3f54b83da27aadc7 100644
++--- a/drivers/net/wireless/ath/ath9k/init.c
+++++ b/drivers/net/wireless/ath/ath9k/init.c
++@@ -744,6 +744,7 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
++ 	INIT_WORK(&sc->hw_reset_work, ath_reset_work);
++ 	INIT_WORK(&sc->paprd_work, ath_paprd_calibrate);
++ 	INIT_DELAYED_WORK(&sc->hw_pll_work, ath_hw_pll_work);
+++	INIT_DELAYED_WORK(&sc->hw_hang_work, ath_hw_hang_work);
++ 
++ 	ath9k_init_channel_context(sc);
++ 
 +diff --git a/drivers/net/wireless/ath/ath9k/link.c b/drivers/net/wireless/ath/ath9k/link.c
-+index 321136767c99951682374a632f94476089d57219..3adcc199e336005765c323bd38651cf21dd13c25 100644
++index 321136767c99951682374a632f94476089d57219..1ed6f2fd27b4db1adc9a0e8489b7e937ca068f22 100644
 +--- a/drivers/net/wireless/ath/ath9k/link.c
 ++++ b/drivers/net/wireless/ath/ath9k/link.c
-+@@ -308,6 +308,7 @@ void ath_ani_calibrate(struct timer_list *t)
-+ 	unsigned int timestamp = jiffies_to_msecs(jiffies);
-+ 	u32 cal_interval, short_cal_interval, long_cal_interval;
-+ 	unsigned long flags;
++@@ -138,6 +138,38 @@ void ath_hw_pll_work(struct work_struct *work)
++ 				     msecs_to_jiffies(ATH_PLL_WORK_INTERVAL));
++ }
++ 
+++static bool ath_hw_hang_deadbeef(struct ath_softc *sc)
+++{
+++	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
 ++	u32 reg;
-+ 
-+ 	if (ah->caldata && test_bit(NFCAL_INTF, &ah->caldata->cal_flags))
-+ 		long_cal_interval = ATH_LONG_CALINTERVAL_INT;
-+@@ -333,6 +334,15 @@ void ath_ani_calibrate(struct timer_list *t)
-+ 
-+ 	ath9k_ps_wakeup(sc);
-+ 
-++	/* check for stucked MAC */
-++	reg = REG_READ(sc->sc_ah, AR_CFG);
-++	if (reg == 0xdeadbeef) {
-++		ath_dbg(common, RESET,
-++			"Deadbeef hang is detected. Schedule chip reset\n");
-++		WARN_ON(reg == 0xdeadbeef);
-++		ath9k_queue_reset(sc, RESET_TYPE_DEADBEEF);
-++	}
 ++
-+ 	/* Long calibration runs independently of short calibration. */
-+ 	if ((timestamp - common->ani.longcal_timer) >= long_cal_interval) {
-+ 		longcal = true;
+++	/* check for stucked MAC */
+++	ath9k_ps_wakeup(sc);
+++	reg = REG_READ(sc->sc_ah, AR_CFG);
+++	ath9k_ps_restore(sc);
+++
+++	if (reg != 0xdeadbeef)
+++		return false;
+++
+++	ath_dbg(common, RESET,
+++		"0xdeadbeef hang is detected. Schedule chip reset\n");
+++
+++	ath9k_queue_reset(sc, RESET_TYPE_DEADBEEF);
+++
+++	return true;
+++}
+++
+++void ath_hw_hang_work(struct work_struct *work)
+++{
+++	struct ath_softc *sc = container_of(work, struct ath_softc,
+++					    hw_hang_work.work);
+++
+++	ath_hw_hang_deadbeef(sc);
+++
+++	ieee80211_queue_delayed_work(sc->hw, &sc->hw_hang_work,
+++				     msecs_to_jiffies(ATH_HANG_WORK_INTERVAL));
+++}
+++
++ /*
++  * PA Pre-distortion.
++  */
++diff --git a/drivers/net/wireless/ath/ath9k/main.c b/drivers/net/wireless/ath/ath9k/main.c
++index 1434cebd2ed0d8573ca664d27103c52473959e72..f08e22d6ea17b2876e2e1ca102f0c083f78330dd 100644
++--- a/drivers/net/wireless/ath/ath9k/main.c
+++++ b/drivers/net/wireless/ath/ath9k/main.c
++@@ -186,6 +186,7 @@ static void __ath_cancel_work(struct ath_softc *sc)
++ 	cancel_work_sync(&sc->paprd_work);
++ 	cancel_delayed_work_sync(&sc->tx_complete_work);
++ 	cancel_delayed_work_sync(&sc->hw_pll_work);
+++	cancel_delayed_work_sync(&sc->hw_hang_work);
++ 
++ #ifdef CPTCFG_ATH9K_BTCOEX_SUPPORT
++ 	if (ath9k_hw_mci_is_enabled(sc->sc_ah))
++@@ -207,6 +208,9 @@ void ath_restart_work(struct ath_softc *sc)
++ 		ieee80211_queue_delayed_work(sc->hw, &sc->hw_pll_work,
++ 				     msecs_to_jiffies(ATH_PLL_WORK_INTERVAL));
++ 
+++	ieee80211_queue_delayed_work(sc->hw, &sc->hw_hang_work,
+++				     msecs_to_jiffies(ATH_HANG_WORK_INTERVAL));
+++
++ 	ath_start_ani(sc);
++ }
++ 
