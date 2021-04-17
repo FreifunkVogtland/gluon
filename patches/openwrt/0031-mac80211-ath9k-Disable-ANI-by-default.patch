@@ -1,0 +1,37 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sat, 17 Apr 2021 20:19:21 +0200
+Subject: mac80211: ath9k: Disable ANI by default
+
+There is reason to believe that something misconfigures the wifi chip
+regularly. This could for example be ANI - so just disable it for now.
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/package/kernel/mac80211/patches/ath/955-ath9k-Disable-ANI-by-default.patch b/package/kernel/mac80211/patches/ath/955-ath9k-Disable-ANI-by-default.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..f5a7ae759719ca483dadac07965e7f96b0c9f48b
+--- /dev/null
++++ b/package/kernel/mac80211/patches/ath/955-ath9k-Disable-ANI-by-default.patch
+@@ -0,0 +1,22 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Sat, 17 Apr 2021 20:17:42 +0200
++Subject: ath9k: Disable ANI by default
++
++There is reason to believe that something misconfigures the wifi chip
++regularly. This could for example be ANI - so just disable it for now.
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++diff --git a/drivers/net/wireless/ath/ath9k/init.c b/drivers/net/wireless/ath/ath9k/init.c
++index de1c6ba12390c307e28af3ac3f54b83da27aadc7..487abe9daa6b900345621664fdd83c236bbb542c 100644
++--- a/drivers/net/wireless/ath/ath9k/init.c
+++++ b/drivers/net/wireless/ath/ath9k/init.c
++@@ -701,7 +701,7 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
++ 	common->priv = sc;
++ 	common->debug_mask = ath9k_debug;
++ 	common->btcoex_enabled = ath9k_btcoex_enable == 1;
++-	common->disable_ani = false;
+++	common->disable_ani = true;
++ 
++ 	/*
++ 	 * Platform quirks.
