@@ -1,0 +1,21 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sun, 14 Oct 2018 20:03:17 +0200
+Subject: mac80211: Increase default distance setting
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+Forwarded: no
+
+diff --git a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+index daa54949a096d4b9f03ef8c473fca81df6b5e4b6..f4a46cc4c3db21f53f67780f1a068fada3bb19fc 100644
+--- a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
++++ b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
+@@ -1088,7 +1088,7 @@ drv_mac80211_setup() {
+ 
+ 	set_default rxantenna 0xffffffff
+ 	set_default txantenna 0xffffffff
+-	set_default distance 0
++	set_default distance 1000
+ 	set_default antenna_gain 0
+ 
+ 	[ "$txantenna" = "all" ] && txantenna=0xffffffff
