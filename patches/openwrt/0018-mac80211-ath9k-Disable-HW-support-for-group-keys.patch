@@ -1,0 +1,49 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sat, 17 Apr 2021 20:08:53 +0200
+Subject: mac80211: ath9k: Disable HW support for group keys
+
+It is known that the HW key "cache" gets destroyed from time to time when
+group keys are modified. This was observed in an extreme way when having
+two devices connected via 11s then switching to wds mode and after that
+switching back to 11s again.
+
+It can also happen easily when more devices are in 11s and the keys are
+refreshed.
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/package/kernel/mac80211/patches/ath/954-ath9k-Disable-HW-support-for-group-keys.patch b/package/kernel/mac80211/patches/ath/954-ath9k-Disable-HW-support-for-group-keys.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..b75b859003c69520eaee52f94c027716086d30f1
+--- /dev/null
++++ b/package/kernel/mac80211/patches/ath/954-ath9k-Disable-HW-support-for-group-keys.patch
+@@ -0,0 +1,29 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Fri, 7 Dec 2018 12:06:49 +0100
++Subject: ath9k: Disable HW support for group keys
++
++It is known that the HW key "cache" gets destroyed from time to time when
++group keys are modified. This was observed in an extreme way when having
++two devices connected via 11s then switching to wds mode and after that
++switching back to 11s again.
++
++It can also happen easily when more devices are in 11s and the keys are
++refreshed.
++
++diff --git a/drivers/net/wireless/ath/ath9k/main.c b/drivers/net/wireless/ath/ath9k/main.c
++index f08e22d6ea17b2876e2e1ca102f0c083f78330dd..dc228325d1367bf3ab17723eac1548130d160a54 100644
++--- a/drivers/net/wireless/ath/ath9k/main.c
+++++ b/drivers/net/wireless/ath/ath9k/main.c
++@@ -1698,11 +1698,7 @@ static int ath9k_set_key(struct ieee80211_hw *hw,
++ 	if (ath9k_modparam_nohwcrypt)
++ 		return -ENOSPC;
++ 
++-	if ((vif->type == NL80211_IFTYPE_ADHOC ||
++-	     vif->type == NL80211_IFTYPE_MESH_POINT) &&
++-	    (key->cipher == WLAN_CIPHER_SUITE_TKIP ||
++-	     key->cipher == WLAN_CIPHER_SUITE_CCMP) &&
++-	    !(key->flags & IEEE80211_KEY_FLAG_PAIRWISE)) {
+++	if (!(key->flags & IEEE80211_KEY_FLAG_PAIRWISE)) {
++ 		/*
++ 		 * For now, disable hw crypto for the RSN IBSS group keys. This
++ 		 * could be optimized in the future to use a modified key cache
