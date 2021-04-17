@@ -6,7 +6,7 @@ Forwarded: no
 
 diff --git a/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch b/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch
 deleted file mode 100644
-index 6a7d554c208fba3b852c147ca181152deb5e0ab6..0000000000000000000000000000000000000000
+index 168fa4e5af8156bb66cfee9f755f9a80f6843794..0000000000000000000000000000000000000000
 --- a/target/linux/generic/hack-4.14/661-use_fq_codel_by_default.patch
 +++ /dev/null
 @@ -1,94 +0,0 @@
@@ -56,7 +56,7 @@ index 6a7d554c208fba3b852c147ca181152deb5e0ab6..00000000000000000000000000000000
 - 	  device, it has to decide which ones to send first, which ones to
 ---- a/net/sched/sch_api.c
 -+++ b/net/sched/sch_api.c
--@@ -2031,7 +2031,7 @@ static int __init pktsched_init(void)
+-@@ -2032,7 +2032,7 @@ static int __init pktsched_init(void)
 - 		return err;
 - 	}
 - 
