@@ -18,7 +18,7 @@ index 61f6da50f4fb0d24294df75b677985788354a497..b9276c855b7e369996d14d01a47d3e53
  
  clean:
 diff --git a/net/respondd-module-airtime/src/respondd.c b/net/respondd-module-airtime/src/respondd.c
-index 4423b10423713e10c6527e8fdfb6eba1d77d4a0f..5d100121ce37ee8c89217226ca32ec552e142681 100644
+index eaf8182056ac6ea16869d32fca03e86f86f84e69..cd0c04cd46d88b2bb50a627d4cbb9c1a1440043a 100644
 --- a/net/respondd-module-airtime/src/respondd.c
 +++ b/net/respondd-module-airtime/src/respondd.c
 @@ -4,12 +4,13 @@
@@ -50,9 +50,9 @@ index 4423b10423713e10c6527e8fdfb6eba1d77d4a0f..5d100121ce37ee8c89217226ca32ec55
  	ifaces = get_ifaces();
  	while (ifaces != NULL) {
  		ok = get_airtime(wireless, ifaces->ifx);
-@@ -30,12 +38,14 @@ static struct json_object *respondd_provider_statistics(void) {
- 			last = json_object_array_get_idx(wireless, newest_element_index);
- 			json_object_object_add(last, "phy", json_object_new_int(ifaces->wiphy));
+@@ -31,12 +39,14 @@ static struct json_object *respondd_provider_statistics(void) {
+ 			if (last)
+ 				json_object_object_add(last, "phy", json_object_new_int(ifaces->wiphy));
  		}
 +		get_txpower(txpower, ifaces->ifx);
  		void *freeptr = ifaces;
