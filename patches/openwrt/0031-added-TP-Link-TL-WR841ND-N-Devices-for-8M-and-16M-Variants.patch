@@ -3,7 +3,7 @@ Date: Fri, 22 Feb 2019 22:45:24 +0100
 Subject: added TP-Link TL-WR841ND/N Devices for 8M and 16M Variants
 
 diff --git a/target/linux/ar71xx/base-files/lib/ar71xx.sh b/target/linux/ar71xx/base-files/lib/ar71xx.sh
-index 044ef4eae5e1cd2f04bacc5b0c18a151f2fe1253..a429f173c4e21d40ad603a4854df04ea6f716203 100755
+index 14b661cfd7606589aa90640cd5ea6eb25ace5d6a..9f2daaf8d1906a13ec9b5e11f89011fa9605ec11 100755
 --- a/target/linux/ar71xx/base-files/lib/ar71xx.sh
 +++ b/target/linux/ar71xx/base-files/lib/ar71xx.sh
 @@ -258,6 +258,12 @@ tplink_board_detect() {

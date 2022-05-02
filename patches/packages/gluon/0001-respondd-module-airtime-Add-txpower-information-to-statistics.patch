@@ -18,10 +18,10 @@ index 61f6da50f4fb0d24294df75b677985788354a497..b9276c855b7e369996d14d01a47d3e53
  
  clean:
 diff --git a/net/respondd-module-airtime/src/respondd.c b/net/respondd-module-airtime/src/respondd.c
-index eaf8182056ac6ea16869d32fca03e86f86f84e69..cd0c04cd46d88b2bb50a627d4cbb9c1a1440043a 100644
+index 8f73d681d071e44b674f3ac1ea7e9e13e3e3396e..bb78a0d3f19a8e1fa99bc73d37d9a98a8c21c6b6 100644
 --- a/net/respondd-module-airtime/src/respondd.c
 +++ b/net/respondd-module-airtime/src/respondd.c
-@@ -4,12 +4,13 @@
+@@ -4,10 +4,11 @@
  #include <respondd.h>
  
  #include "airtime.h"
@@ -29,14 +29,12 @@ index eaf8182056ac6ea16869d32fca03e86f86f84e69..cd0c04cd46d88b2bb50a627d4cbb9c1a
  #include "ifaces.h"
  
  static struct json_object *respondd_provider_statistics(void) {
- 	bool ok;
- 	int newest_element_index;
--	struct json_object *last, *result, *wireless;
-+	struct json_object *last, *result, *wireless, *txpower;
+-	struct json_object *result, *wireless;
++	struct json_object *result, *wireless, *txpower;
  	struct iface_list *ifaces;
  
  	result = json_object_new_object();
-@@ -22,6 +23,13 @@ static struct json_object *respondd_provider_statistics(void) {
+@@ -20,17 +21,26 @@ static struct json_object *respondd_provider_statistics(void) {
  		return NULL;
  	}
  
@@ -49,11 +47,9 @@ index eaf8182056ac6ea16869d32fca03e86f86f84e69..cd0c04cd46d88b2bb50a627d4cbb9c1a
 +
  	ifaces = get_ifaces();
  	while (ifaces != NULL) {
- 		ok = get_airtime(wireless, ifaces->ifx);
-@@ -31,12 +39,14 @@ static struct json_object *respondd_provider_statistics(void) {
- 			if (last)
- 				json_object_object_add(last, "phy", json_object_new_int(ifaces->wiphy));
- 		}
+ 		struct json_object *entry = get_airtime(ifaces->ifx);
+ 		if (entry)
+ 			json_object_array_add(wireless, entry);
 +		get_txpower(txpower, ifaces->ifx);
  		void *freeptr = ifaces;
  		ifaces = ifaces->next;

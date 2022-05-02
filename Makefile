@@ -19,8 +19,9 @@ escape = '$(subst ','\'',$(1))'
 GLUON_SITEDIR ?= site
 $(eval $(call mkabspath,GLUON_SITEDIR))
 
-$(GLUON_SITEDIR)/site.mk:
-	$(error No site configuration was found. Please check out a site configuration to $(GLUON_SITEDIR))
+ifeq ($(realpath $(GLUON_SITEDIR)/site.mk),)
+$(error No site configuration was found. Please check out a site configuration to $(GLUON_SITEDIR))
+endif
 
 include $(GLUON_SITEDIR)/site.mk
 
@@ -174,6 +175,10 @@ config: $(LUA) FORCE
 	$(GLUON_ENV) $(LUA) scripts/target_config.lua > openwrt/.config
 	$(OPENWRTMAKE) defconfig
 	$(GLUON_ENV) $(LUA) scripts/target_config_check.lua
+
+
+container: FORCE
+	@scripts/container.sh
 
 
 all: config
