@@ -25,6 +25,11 @@ device('netgear-wndr3700v5', 'wndr3700v5', {
 	broken = true, -- untested
 })
 
+-- Xiaomi
+
+device('xiaomi-mi-router-4a-gigabit-edition', 'xiaomi_mi-router-4a-gigabit', {
+	factory = false,
+})
 
 -- ZBT
 
