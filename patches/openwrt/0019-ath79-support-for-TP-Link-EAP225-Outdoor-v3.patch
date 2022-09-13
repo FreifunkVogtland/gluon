@@ -1,0 +1,326 @@
+From: Paul Maruhn <paulmaruhn@posteo.de>
+Date: Tue, 22 Mar 2022 21:06:42 +0100
+Subject: ath79: support for TP-Link EAP225-Outdoor v3
+
+This model is almost identical to the EAP225-Outdoor v1.
+Major difference is the RTL8211FS PHY Chipset.
+
+Device specifications:
+* SoC: QCA9563 @ 775MHz
+* Memory: 128MiB DDR2
+* Flash: 16MiB SPI-NOR
+* Wireless 2.4GHz (SoC): b/g/n 2x2
+* Wireless 5GHz (QCA9886): a/n/ac 2x2 MU-MIMO
+* Ethernet (RTL8211FS): 1× 1GbE, PoE
+
+Flashing instructions:
+* ssh into target device with recent (>= v1.6.0) firmware
+* run `cliclientd stopcs` on target device
+* upload factory image via web interface
+
+Debricking:
+To recover the device, you need access to the serial port. This requires
+fine soldering to test points, or the use of probe pins.
+* Open the case and solder wires to the test points: RXD, TXD and TPGND4
+  * Use a 3.3V UART, 115200 baud, 8n1
+* Interrupt bootloader by holding ctrl+B during boot
+* upload initramfs via built-in tftp client and perform sysupgrade
+    setenv ipaddr 192.168.1.1 # default, change as required
+    setenv serverip 192.168.1.10 # default, change as required
+    tftp 0x80800000 initramfs.bin
+    bootelf $fileaddr
+
+MAC addresses:
+MAC address (as on device label) is stored in device info partition at
+an offset of 8 bytes. ath9k device has same address as ethernet, ath10k
+uses address incremented by 1.
+From stock ifconfig:
+
+    ath0      Link encap:Ethernet  HWaddr D8:...:2E
+    ath10     Link encap:Ethernet  HWaddr D8:...:2F
+    br0       Link encap:Ethernet  HWaddr D8:...:2E
+    eth0      Link encap:Ethernet  HWaddr D8:...:2E
+
+Signed-off-by: Paul Maruhn <paulmaruhn@posteo.de>
+Co-developed-by: Philipp Rothmann <philipprothmann@posteo.de>
+Signed-off-by: Philipp Rothmann <philipprothmann@posteo.de>
+[Add pre-calibraton nvme-cells]
+Tested-by: Tido Klaassen <tido_ff@4gh.eu>
+Signed-off-by: Nick Hainke <vincent@systemli.org>
+
+diff --git a/target/linux/ath79/dts/qca9563_tplink_eap225-outdoor-v3.dts b/target/linux/ath79/dts/qca9563_tplink_eap225-outdoor-v3.dts
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8719b3a0176361eba829a009940e7c19b59d7d6
+--- /dev/null
++++ b/target/linux/ath79/dts/qca9563_tplink_eap225-outdoor-v3.dts
+@@ -0,0 +1,62 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++
++#include "qca9563_tplink_eap2x5-1port.dtsi"
++
++/ {
++	compatible = "tplink,eap225-outdoor-v3", "qca,qca9563";
++	model = "TP-Link EAP225-Outdoor v3";
++
++	aliases {
++		led-boot = &led_status_green;
++		led-failsafe = &led_status_amber;
++		led-running = &led_status_green;
++		led-upgrade = &led_status_amber;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		led_status_green: status_green {
++			label = "green:status";
++			gpios = <&gpio 7 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++		};
++
++		led_status_amber: status_amber {
++			label = "amber:status";
++			gpios = <&gpio 9 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&art {
++	precalibration_ath10k: pre-calibration@5000 {
++		reg = <0x5000 0x2f20>;
++	};
++};
++
++&eth0 {
++	phy-handle = <&phy6>;
++	phy-mode = "sgmii";
++};
++
++&mdio0 {
++	/* only for the backport */
++	/delete-node/ ethernet-phy@4;
++
++	phy6: ethernet-phy@6 {
++		reg = <6>;
++	};
++};
++
++&pcie {
++	wifi@0,0 {
++		compatible = "qcom,ath10k";
++		reg = <0 0 0 0 0>;
++
++		mac-address-increment = <1>;
++
++		nvmem-cells = <&macaddr_info_8>, <&precalibration_ath10k>;
++		nvmem-cell-names = "mac-address", "pre-calibration";
++	};
++};
+diff --git a/target/linux/ath79/generic/base-files/etc/board.d/02_network b/target/linux/ath79/generic/base-files/etc/board.d/02_network
+index 8f9516b8c681fd09c37fb183a63c17cf84f94bfc..b17ef03afcdf12c7a2c51fa8b0eaf3c90ad6fdd9 100644
+--- a/target/linux/ath79/generic/base-files/etc/board.d/02_network
++++ b/target/linux/ath79/generic/base-files/etc/board.d/02_network
+@@ -78,6 +78,7 @@ ath79_setup_interfaces()
+ 	tplink,cpe610-v2|\
+ 	tplink,cpe710-v1|\
+ 	tplink,eap225-outdoor-v1|\
++	tplink,eap225-outdoor-v3|\
+ 	tplink,eap225-v1|\
+ 	tplink,eap225-v3|\
+ 	tplink,eap245-v1|\
+diff --git a/target/linux/ath79/image/generic-tp-link.mk b/target/linux/ath79/image/generic-tp-link.mk
+index fed572c884c75bd21081c7c22dd4652ecefdd993..3d3a45711302b7a73c914d80ec0d309878813149 100644
+--- a/target/linux/ath79/image/generic-tp-link.mk
++++ b/target/linux/ath79/image/generic-tp-link.mk
+@@ -401,6 +401,17 @@ define Device/tplink_eap225-outdoor-v1
+ endef
+ TARGET_DEVICES += tplink_eap225-outdoor-v1
+ 
++define Device/tplink_eap225-outdoor-v3
++  $(Device/tplink-eap2x5)
++  SOC := qca9563
++  IMAGE_SIZE := 13824k
++  DEVICE_MODEL := EAP225-Outdoor
++  DEVICE_VARIANT := v3
++  DEVICE_PACKAGES := kmod-ath10k-ct ath10k-firmware-qca9888-ct
++  TPLINK_BOARD_ID := EAP225-V3
++endef
++TARGET_DEVICES += tplink_eap225-outdoor-v3
++
+ define Device/tplink_eap225-v1
+   $(Device/tplink-eap2x5)
+   SOC := qca9563
+diff --git a/tools/firmware-utils/patches/0001-tplink-safeloader-join-EAP225-V3-compatible-devices.patch b/tools/firmware-utils/patches/0001-tplink-safeloader-join-EAP225-V3-compatible-devices.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..842f4d3dcec97b8e107a042cfde5277ffdd1dcdd
+--- /dev/null
++++ b/tools/firmware-utils/patches/0001-tplink-safeloader-join-EAP225-V3-compatible-devices.patch
+@@ -0,0 +1,54 @@
++From: Sander Vanheule <sander@svanheule.net>
++Date: Thu, 26 May 2022 09:11:29 +0200
++Subject: tplink-safeloader: join EAP225-V3 compatible devices
++
++Since FW v5.0.0, TP-Link has provided unified firmware images for
++EAP225-v3 and EAP225-Outdoor-v1 devices. Although there may be hardware
++differences, the relevant details for image generation are identical.
++
++More recently, the following devices have also been added to the support
++list:
++  - EAP225-v3.20
++  - EAP225-Outdoor-v3
++  - EAP225-v4
++
++The country codes appended the device descriptors were introduced with
++FW v5.0.7: "Combined firmware versions for different countries/regions."
++The release notes provide no further upgrade instructions, so these
++firmware images should be backwards compatible.
++
++Add the new compatible devices, with region codes, to the support list
++of the EAP225-V3 board ID. The now redundant EAP225-OUTDOOR-V1 ID will
++be dropped later.
++
++Signed-off-by: Sander Vanheule <sander@svanheule.net>
++
++diff --git a/src/tplink-safeloader.c b/src/tplink-safeloader.c
++index fc46124d48fe9d3d2d33d5eae9099a0ae2cfa484..a42ce6a198ba5350285b932c680ae06e173e7dbb 100644
++--- a/src/tplink-safeloader.c
+++++ b/src/tplink-safeloader.c
++@@ -1603,12 +1603,22 @@ static struct device_info boards[] = {
++ 		.last_sysupgrade_partition = "file-system"
++ 	},
++ 
++-	/** Firmware layout for the EAP225 v3 */
+++	/** Firmware layout for the EAP225 v3
+++	 * Also compatible with:
+++	 *   - EAP225 v3.20
+++	 *   - EAP225 v4
+++	 *   - EAP225-Outdoor v1
+++	 *   - EAP225-Outdoor v3
+++	 *   */
++ 	{
++ 		.id     = "EAP225-V3",
++ 		.support_list =
++ 			"SupportList:\r\n"
++-			"EAP225(TP-Link|UN|AC1350-D):3.0\r\n",
+++			"EAP225(TP-Link|UN|AC1350-D):3.0\r\n"
+++			"EAP225(TP-Link|UN|AC1350-D):3.20\r\n"
+++			"EAP225(TP-Link|UN|AC1350-D):4.0 CA\r\n"
+++			"EAP225-Outdoor(TP-Link|UN|AC1350-D):1.0\r\n"
+++			"EAP225-Outdoor(TP-Link|UN|AC1350-D):3.0 CA,JP\r\n",
++ 		.part_trail = PART_TRAIL_NONE,
++ 		.soft_ver = SOFT_VER_DEFAULT,
++ 		.soft_ver_compat_level = 1,
+diff --git a/tools/firmware-utils/patches/0002-tplink-safeloader-add-regionless-EAP225-V3-IDs.patch b/tools/firmware-utils/patches/0002-tplink-safeloader-add-regionless-EAP225-V3-IDs.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..4065383968e65e517eecf2407a04281b378fc460
+--- /dev/null
++++ b/tools/firmware-utils/patches/0002-tplink-safeloader-add-regionless-EAP225-V3-IDs.patch
+@@ -0,0 +1,29 @@
++From: Sander Vanheule <sander@svanheule.net>
++Date: Sun, 26 Jun 2022 16:30:34 +0200
++Subject: tplink-safeloader: add regionless EAP225-V3 IDs
++
++Devices whose model ID does not contain a region identifier will not
++match the "CA" and "CA,JP" qualified model IDs in the current EAP225-V3
++SupportList. This results in the stock firmware giving the following
++error when trying to flash a factory image:
++    Upgrade failed because the firmware is incompatible
++
++Add the IDs without region qualifiers to also support these devices.
++
++Signed-off-by: Sander Vanheule <sander@svanheule.net>
++
++diff --git a/src/tplink-safeloader.c b/src/tplink-safeloader.c
++index a42ce6a198ba5350285b932c680ae06e173e7dbb..3f58f95ce5c5faaa2fe68c610832dab4131bf338 100644
++--- a/src/tplink-safeloader.c
+++++ b/src/tplink-safeloader.c
++@@ -1616,8 +1616,10 @@ static struct device_info boards[] = {
++ 			"SupportList:\r\n"
++ 			"EAP225(TP-Link|UN|AC1350-D):3.0\r\n"
++ 			"EAP225(TP-Link|UN|AC1350-D):3.20\r\n"
+++			"EAP225(TP-Link|UN|AC1350-D):4.0\r\n"
++ 			"EAP225(TP-Link|UN|AC1350-D):4.0 CA\r\n"
++ 			"EAP225-Outdoor(TP-Link|UN|AC1350-D):1.0\r\n"
+++			"EAP225-Outdoor(TP-Link|UN|AC1350-D):3.0\r\n"
++ 			"EAP225-Outdoor(TP-Link|UN|AC1350-D):3.0 CA,JP\r\n",
++ 		.part_trail = PART_TRAIL_NONE,
++ 		.soft_ver = SOFT_VER_DEFAULT,
+diff --git a/tools/firmware-utils/patches/0003-tplink-safeloader-fix-EAP225-Outdoor-model-IDs.patch b/tools/firmware-utils/patches/0003-tplink-safeloader-fix-EAP225-Outdoor-model-IDs.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..80965460277fb15fd1b9c6541f8cecc121ef0c69
+--- /dev/null
++++ b/tools/firmware-utils/patches/0003-tplink-safeloader-fix-EAP225-Outdoor-model-IDs.patch
+@@ -0,0 +1,30 @@
++From: Sander Vanheule <sander@svanheule.net>
++Date: Sun, 26 Jun 2022 16:43:07 +0200
++Subject: tplink-safeloader: fix EAP225-Outdoor model IDs
++
++The model IDs for EAP225-Outdoor v1 and EAP225-Outdoor v3 contain
++"AC1200". The corresponding identifiers grouped under EAP225-V3 contain
++"AC1350" however, which is a copy-paste error from the EAP225 v3/v3.2/v4
++IDs. Modify the strings in SupportList to actually match the ones on devices.
++
++Fixes: 9563fe8e78cb ("tplink-safeloader: add regionless EAP225-V3 IDs")
++Fixes: 365458e00ed7 ("tplink-safeloader: join EAP225-V3 compatible devices")
++Signed-off-by: Sander Vanheule <sander@svanheule.net>
++
++diff --git a/src/tplink-safeloader.c b/src/tplink-safeloader.c
++index 3f58f95ce5c5faaa2fe68c610832dab4131bf338..c941159c5bd6ac7566e4269e0a997dbefd1d4e00 100644
++--- a/src/tplink-safeloader.c
+++++ b/src/tplink-safeloader.c
++@@ -1618,9 +1618,9 @@ static struct device_info boards[] = {
++ 			"EAP225(TP-Link|UN|AC1350-D):3.20\r\n"
++ 			"EAP225(TP-Link|UN|AC1350-D):4.0\r\n"
++ 			"EAP225(TP-Link|UN|AC1350-D):4.0 CA\r\n"
++-			"EAP225-Outdoor(TP-Link|UN|AC1350-D):1.0\r\n"
++-			"EAP225-Outdoor(TP-Link|UN|AC1350-D):3.0\r\n"
++-			"EAP225-Outdoor(TP-Link|UN|AC1350-D):3.0 CA,JP\r\n",
+++			"EAP225-Outdoor(TP-Link|UN|AC1200-D):1.0\r\n"
+++			"EAP225-Outdoor(TP-Link|UN|AC1200-D):3.0\r\n"
+++			"EAP225-Outdoor(TP-Link|UN|AC1200-D):3.0 CA,JP\r\n",
++ 		.part_trail = PART_TRAIL_NONE,
++ 		.soft_ver = SOFT_VER_DEFAULT,
++ 		.soft_ver_compat_level = 1,
+diff --git a/tools/firmware-utils/patches/0004-tplink-safeloader-drop-unqualified-EAP225-V3-IDs.patch b/tools/firmware-utils/patches/0004-tplink-safeloader-drop-unqualified-EAP225-V3-IDs.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..9cf50b1ffd5c5c3b2b7ec6d6a8a1137ae091467b
+--- /dev/null
++++ b/tools/firmware-utils/patches/0004-tplink-safeloader-drop-unqualified-EAP225-V3-IDs.patch
+@@ -0,0 +1,37 @@
++From: Sander Vanheule <sander@svanheule.net>
++Date: Mon, 27 Jun 2022 18:31:24 +0200
++Subject: tplink-safeloader: drop unqualified EAP225-V3 IDs
++
++After adding the regionless identifiers in commit 9563fe8e78cb
++("tplink-safeloader: add regionless EAP225-V3 IDs"), the generated
++support-list partition exceeded the allocated space of 256 bytes. This
++resulted in the tool failing to generate factory images with the
++following warning:
++    support-list partition too big (more than 256 bytes): Success
++
++Although this message reports "Success", the tool actually fails with a
++return code of 1.
++
++This essentialy reverts commit 9563fe8e78cb, since the region-qualified
++IDs are also compatible with the non region-qualified devices. The
++change makes the generated support-list partition fit within the
++allocated space again.
++
++Tested-by: Andre Klärner <kandre@ak-online.be>
++Signed-off-by: Sander Vanheule <sander@svanheule.net>
++
++diff --git a/src/tplink-safeloader.c b/src/tplink-safeloader.c
++index c941159c5bd6ac7566e4269e0a997dbefd1d4e00..eaeb45ca25930be2003911347adb1dd3e411acec 100644
++--- a/src/tplink-safeloader.c
+++++ b/src/tplink-safeloader.c
++@@ -1616,10 +1616,8 @@ static struct device_info boards[] = {
++ 			"SupportList:\r\n"
++ 			"EAP225(TP-Link|UN|AC1350-D):3.0\r\n"
++ 			"EAP225(TP-Link|UN|AC1350-D):3.20\r\n"
++-			"EAP225(TP-Link|UN|AC1350-D):4.0\r\n"
++ 			"EAP225(TP-Link|UN|AC1350-D):4.0 CA\r\n"
++ 			"EAP225-Outdoor(TP-Link|UN|AC1200-D):1.0\r\n"
++-			"EAP225-Outdoor(TP-Link|UN|AC1200-D):3.0\r\n"
++ 			"EAP225-Outdoor(TP-Link|UN|AC1200-D):3.0 CA,JP\r\n",
++ 		.part_trail = PART_TRAIL_NONE,
++ 		.soft_ver = SOFT_VER_DEFAULT,
