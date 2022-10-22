@@ -185,6 +185,7 @@ ipq40xx-generic
 
 * GL.iNet
 
+  - GL-AP1300
   - GL-B1300
 
 * Linksys
@@ -268,6 +269,10 @@ mpc85xx-p1010
 * Sophos
 
   - RED 15w Rev.1
+
+* TP-Link
+
+  - TL-WDR4900 (v1)
 
 mpc85xx-p1020
 ---------------
@@ -360,6 +365,10 @@ ramips-mt7621
   - WG3526-16M
   - WG3526-32M
 
+* ZyXEL
+
+  - NWA50AX
+
 * Xiaomi
 
   - Xiaomi Mi Router 4A (Gigabit Edition)
@@ -416,6 +425,7 @@ rockchip-armv8
 * FriendlyElec
 
   - NanoPi R2S
+  - NanoPi R4S (4GB LPDDR4)
 
 sunxi-cortexa7
 --------------
