@@ -7,7 +7,7 @@ Signed-off-by: Sven Eckelmann <sven@narfation.org>
 Forwarded: no
 
 diff --git a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
-index daa54949a096d4b9f03ef8c473fca81df6b5e4b6..f4a46cc4c3db21f53f67780f1a068fada3bb19fc 100644
+index 5fda6d17395721fcf7dbc4257c32d758c7befd47..5082f252e97e321206ec772d167da8fe6af2b927 100644
 --- a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
 +++ b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
 @@ -1088,7 +1088,7 @@ drv_mac80211_setup() {
