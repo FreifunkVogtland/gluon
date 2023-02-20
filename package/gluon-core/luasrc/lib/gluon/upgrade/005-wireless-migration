@@ -1,5 +1,11 @@
 #!/usr/bin/lua
 
+-- workaround an issue with wifi setup timing by waiting a bit
+-- while device initialisation is ongoing.
+-- https://github.com/freifunk-gluon/gluon/issues/2779
+local unistd = require 'posix.unistd'
+unistd.sleep(3)
+
 local uci = require('simple-uci').cursor()
 
 -- Migration from hwmode to band (OpenWrt 21.02)
