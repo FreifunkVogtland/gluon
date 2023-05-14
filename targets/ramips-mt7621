@@ -11,10 +11,32 @@ device('cudy-wr2100', 'cudy_wr2100', {
         factory = false,
 })
 
+device('cudy-x6-v1', 'cudy_x6-v1', {
+	factory = false,
+})
+
+device('cudy-x6-v2', 'cudy_x6-v2', {
+	factory = false,
+})
+
 
 -- D-Link
 
+device('d-link-dap-x1860-a1', 'dlink_dap-x1860-a1')
+
 device('d-link-dir-860l-b1', 'dlink_dir-860l-b1')
+
+
+-- GL.iNet
+
+device('gl.inet-gl-mt1300', 'glinet_gl-mt1300', {
+	factory = false,
+})
+
+
+-- Mercusys
+
+device('mercusys-mr70x-v1', 'mercusys_mr70x-v1')
 
 
 -- Netgear
@@ -66,10 +88,13 @@ device('xiaomi-mi-router-4a-gigabit-edition', 'xiaomi_mi-router-4a-gigabit', {
 	factory = false,
 })
 
-device('xiaomi-mi-router-3g-v2', 'xiaomi_mi-router-3g-v2', {
+device('xiaomi-mi-router-3g', 'xiaomi_mi-router-3g', {
 	factory = false,
 })
 
+device('xiaomi-mi-router-3g-v2', 'xiaomi_mi-router-3g-v2', {
+	factory = false,
+})
 
 -- ZBT
 

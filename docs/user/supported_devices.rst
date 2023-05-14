@@ -53,6 +53,10 @@ ath79-generic
 
   - JT-OR750i
 
+* LibreRouter
+
+  - LibreRouter v1 [#missing_radios]_
+
 * Netgear
 
   - WNDR3700 (v1, v2)
@@ -90,6 +94,10 @@ ath79-generic
 * Siemens
 
   - WS-AP3610
+
+* Teltonika
+
+  - RUT230 (v1)
 
 * TP-Link
 
@@ -134,6 +142,10 @@ ath79-generic
 ath79-nand
 ----------
 
+* Aerohive
+
+  - HiveAP 121
+
 * GL.iNet
 
   - GL-AR300M
@@ -142,6 +154,7 @@ ath79-nand
 * Netgear
 
   - WNDR3700 (v4)
+  - WNDR4300 (v1)
 
 ath79-mikrotik
 --------------
@@ -176,6 +189,7 @@ ipq40xx-generic
 * AVM
 
   - FRITZ!Box 4040 [#avmflash]_
+  - FRITZ!Box 7520 (v1) [#eva_ramboot]_
   - FRITZ!Box 7530 [#eva_ramboot]_
   - FRITZ!Repeater 1200 [#eva_ramboot]_
 
@@ -218,6 +232,7 @@ ipq40xx-mikrotik
 * Mikrotik
 
   - DISC Lite5 ac (RBDiscG-5acD)
+  - hAP ac2
   - SXTsq 5 ac (RBSXTsqG-5acD)
 
 ipq806x-generic
@@ -230,12 +245,20 @@ ipq806x-generic
 lantiq-xrx200
 -------------
 
+* Arcadyan
+
+  - VGV7510KW22 (o2 Box 6431)
+
 * AVM
 
   - FRITZ!Box 7360 (v1, v2) [#avmflash]_ [#lan_as_wan]_
   - FRITZ!Box 7360 SL [#avmflash]_ [#lan_as_wan]_
   - FRITZ!Box 7362 SL [#eva_ramboot]_ [#lan_as_wan]_
   - FRITZ!Box 7412 [#eva_ramboot]_
+
+* TP-Link
+
+  - TD-W8970 (v1) [#lan_as_wan]_
 
 lantiq-xway
 -----------
@@ -336,10 +359,20 @@ ramips-mt7621
 * Cudy
 
   - WR2100
+  - X6 (v1, v2)
 
 * D-Link
 
+  - DAP-X1860 (A1)
   - DIR-860L (B1)
+
+* GL.iNet
+
+  - GL-MT1300
+
+* Mercusys
+
+  - MR70X (v1)
 
 * NETGEAR
 
@@ -372,7 +405,7 @@ ramips-mt7621
 * Xiaomi
 
   - Xiaomi Mi Router 4A (Gigabit Edition)
-  - Xiaomi Mi Router 3G v2
+  - Xiaomi Mi Router 3G (v1, v2)
 
 ramips-mt76x8
 -------------
@@ -401,7 +434,7 @@ ramips-mt76x8
   - Archer C20 (v4, v5)
   - Archer C50 (v3)
   - Archer C50 (v4)
-  - RE200 (v2)
+  - RE200 (v2, v3)
   - RE305 (v1) [#device-class-tiny]
   - TL-MR3020 (v3)
   - TL-MR3420 (v5)
@@ -418,6 +451,13 @@ ramips-mt76x8
   - Xiaomi Mi Router 4A (100M Edition)
   - Xiaomi Mi Router 4A (100M International Edition)
   - Xiaomi Mi Router 4C
+
+realtek-rtl838x
+---------------
+
+* D-Link
+
+  - DGS-1210-10P (F1)
 
 rockchip-armv8
 --------------
@@ -477,6 +517,10 @@ Footnotes
 
 .. [#lan_as_wan]
   All LAN ports on this device are used as WAN.
+
+.. [#missing_radios]
+  This device contains more than two WLAN radios, which is currently
+  unsupported by Gluon. Only the first two radios will work.
 
 .. [#modular_ethernet]
   These devices follow a modular principle,
