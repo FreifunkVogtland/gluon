@@ -7,10 +7,10 @@ Signed-off-by: Sven Eckelmann <sven@narfation.org>
 Forwarded: no
 
 diff --git a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
-index 1bf4db6e5f0554bce5e93d024563becd10ec81ba..0438c14c119526bbd909ea23254482d5b4d43b9d 100644
+index 6ff627b03813bb2de0cd1f465014cc74031106a3..fdd03142dbe655e5085241f5a781b807fbda3f5e 100644
 --- a/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
 +++ b/package/kernel/mac80211/files/lib/netifd/wireless/mac80211.sh
-@@ -1093,7 +1093,7 @@ drv_mac80211_setup() {
+@@ -1098,7 +1098,7 @@ drv_mac80211_setup() {
  
  	set_default rxantenna 0xffffffff
  	set_default txantenna 0xffffffff
