@@ -76,6 +76,7 @@ ath79-generic
   - WNDR3700 (v1, v2)
   - WNDR3800
   - WNR2200 (8M, 16M)
+  - WNDRMAC (v2)
 
 * OCEDO
 
@@ -368,6 +369,10 @@ mpc85xx-p1020
 * Extreme Networks
 
   - WS-AP3825i
+
+* Hewlett-Packard
+
+  - MSM460
 
 * Ocedo
 
