@@ -395,6 +395,7 @@ ramips-mt7620
 
   - EX3700
   - EX3800
+  - EX6130
 
 * Nexx
 
@@ -466,7 +467,7 @@ ramips-mt7621
 * Xiaomi
 
   - Xiaomi Mi Router 3G (v1, v2)
-  - Xiaomi Mi Router 4A (Gigabit Edition v1)
+  - Xiaomi Mi Router 4A (Gigabit Edition v1, v2)
 
 * ZBT
 
@@ -504,7 +505,7 @@ ramips-mt76x8
 
   - Archer C20 (v4, v5)
   - Archer C50 (v3, v4)
-  - RE200 (v2, v3)
+  - RE200 (v2, v3, v4)
   - TL-MR3020 (v3)
   - TL-MR3420 (v5)
   - TL-MR6400 (v5)

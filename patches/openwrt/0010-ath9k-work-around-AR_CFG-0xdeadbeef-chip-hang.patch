@@ -40,19 +40,17 @@ index 0000000000000000000000000000000000000000..146d0a9cf8ada26a6ff7d3ed32b4041f
 + 
 diff --git a/package/kernel/mac80211/patches/ath/951-Revert-354-ath9k-rename-tx_complete_work-to-hw_check.patch b/package/kernel/mac80211/patches/ath/951-Revert-354-ath9k-rename-tx_complete_work-to-hw_check.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9cf3d42c1c
+index 0000000000000000000000000000000000000000..e9f45c7398c8be5241e15e848d540146756b7668
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/ath/951-Revert-354-ath9k-rename-tx_complete_work-to-hw_check.patch
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,168 @@
 +From: Sven Eckelmann <sven@narfation.org>
 +Date: Thu, 23 Apr 2020 18:44:45 +0200
 +Subject: Revert 354-ath9k-rename-tx_complete_work-to-hw_check.patch
 +
-+diff --git a/drivers/net/wireless/ath/ath9k/ath9k.h b/drivers/net/wireless/ath/ath9k/ath9k.h
-+index 15ea905a52192b7d97e0962331282bb319dd267e..e38065b2e79f3df92c4679c310a1de871134460f 100644
 +--- a/drivers/net/wireless/ath/ath9k/ath9k.h
 ++++ b/drivers/net/wireless/ath/ath9k/ath9k.h
-+@@ -110,7 +110,7 @@ int ath_descdma_setup(struct ath_softc *sc, struct ath_descdma *dd,
++@@ -108,7 +108,7 @@ int ath_descdma_setup(struct ath_softc *
 + #define ATH_AGGR_MIN_QDEPTH        2
 + /* minimum h/w qdepth for non-aggregated traffic */
 + #define ATH_NON_AGGR_MIN_QDEPTH    8
@@ -61,7 +59,7 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + #define ATH_TXFIFO_DEPTH           8
 + #define ATH_TX_ERROR               0x01
 + 
-+@@ -747,7 +747,7 @@ void ath9k_csa_update(struct ath_softc *sc);
++@@ -738,7 +738,7 @@ void ath9k_csa_update(struct ath_softc *
 + #define ATH_PAPRD_TIMEOUT         100 /* msecs */
 + #define ATH_PLL_WORK_INTERVAL     100
 + 
@@ -70,7 +68,7 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + void ath_reset_work(struct work_struct *work);
 + bool ath_hw_check(struct ath_softc *sc);
 + void ath_hw_pll_work(struct work_struct *work);
-+@@ -1080,7 +1080,7 @@ struct ath_softc {
++@@ -1040,7 +1040,7 @@ struct ath_softc {
 + #ifdef CPTCFG_ATH9K_DEBUGFS
 + 	struct ath9k_debug debug;
 + #endif
@@ -79,11 +77,9 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + 	struct delayed_work hw_pll_work;
 + 	struct timer_list sleep_timer;
 + 
-+diff --git a/drivers/net/wireless/ath/ath9k/init.c b/drivers/net/wireless/ath/ath9k/init.c
-+index 97f8fc6448f8de692cf2e3eccd77c35a03e3f958..67b4457d0019325ca4919e96d5a5820b357cd9cc 100644
 +--- a/drivers/net/wireless/ath/ath9k/init.c
 ++++ b/drivers/net/wireless/ath/ath9k/init.c
-+@@ -744,7 +744,6 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
++@@ -787,7 +787,6 @@ static int ath9k_init_softc(u16 devid, s
 + 	INIT_WORK(&sc->hw_reset_work, ath_reset_work);
 + 	INIT_WORK(&sc->paprd_work, ath_paprd_calibrate);
 + 	INIT_DELAYED_WORK(&sc->hw_pll_work, ath_hw_pll_work);
@@ -91,8 +87,6 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + 
 + 	ath9k_init_channel_context(sc);
 + 
-+diff --git a/drivers/net/wireless/ath/ath9k/link.c b/drivers/net/wireless/ath/ath9k/link.c
-+index 9d84003db800e9513f07ee85a4203dbb7636edf0..321136767c99951682374a632f94476089d57219 100644
 +--- a/drivers/net/wireless/ath/ath9k/link.c
 ++++ b/drivers/net/wireless/ath/ath9k/link.c
 +@@ -20,13 +20,20 @@
@@ -107,10 +101,10 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + 	struct ath_txq *txq;
 + 	int i;
 ++	bool needreset = false;
+++
 + 
 +-	if (sc->tx99_state)
 +-		return true;
-++
 ++	if (sc->tx99_state) {
 ++		ath_dbg(ath9k_hw_common(sc->sc_ah), RESET,
 ++			"skip tx hung detection on tx99\n");
@@ -119,7 +113,7 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + 
 + 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
 + 		txq = sc->tx.txq_map[i];
-+@@ -34,36 +41,25 @@ static bool ath_tx_complete_check(struct ath_softc *sc)
++@@ -34,36 +41,25 @@ static bool ath_tx_complete_check(struct
 + 		ath_txq_lock(sc, txq);
 + 		if (txq->axq_depth) {
 + 			if (txq->axq_tx_inprogress) {
@@ -167,11 +161,9 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + }
 + 
 + /*
-+diff --git a/drivers/net/wireless/ath/ath9k/main.c b/drivers/net/wireless/ath/ath9k/main.c
-+index 434fb92f31b2b0a6803884de785133824225111a..49c07032e15a041c58b4467c09f470545ffe5bb0 100644
 +--- a/drivers/net/wireless/ath/ath9k/main.c
 ++++ b/drivers/net/wireless/ath/ath9k/main.c
-+@@ -184,7 +184,7 @@ void ath9k_ps_restore(struct ath_softc *sc)
++@@ -184,7 +184,7 @@ void ath9k_ps_restore(struct ath_softc *
 + static void __ath_cancel_work(struct ath_softc *sc)
 + {
 + 	cancel_work_sync(&sc->paprd_work);
@@ -180,17 +172,17 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + 	cancel_delayed_work_sync(&sc->hw_pll_work);
 + 
 + #ifdef CPTCFG_ATH9K_BTCOEX_SUPPORT
-+@@ -201,8 +201,7 @@ void ath_cancel_work(struct ath_softc *sc)
++@@ -201,8 +201,7 @@ void ath_cancel_work(struct ath_softc *s
 + 
 + void ath_restart_work(struct ath_softc *sc)
 + {
 +-	ieee80211_queue_delayed_work(sc->hw, &sc->hw_check_work,
-+-				     ATH_HW_CHECK_POLL_INT);
++-				     msecs_to_jiffies(ATH_HW_CHECK_POLL_INT));
 ++	ieee80211_queue_delayed_work(sc->hw, &sc->tx_complete_work, 0);
 + 
 + 	if (AR_SREV_9340(sc->sc_ah) || AR_SREV_9330(sc->sc_ah))
 + 		ieee80211_queue_delayed_work(sc->hw, &sc->hw_pll_work,
-+@@ -2102,7 +2101,7 @@ void __ath9k_flush(struct ieee80211_hw *hw, u32 queues, bool drop,
++@@ -2200,7 +2199,7 @@ void __ath9k_flush(struct ieee80211_hw *
 + 	int timeout;
 + 	bool drain_txq;
 + 
@@ -199,21 +191,19 @@ index 0000000000000000000000000000000000000000..d36920144cdd7a43ff91efc556602f9c
 + 
 + 	if (ah->ah_flags & AH_UNPLUGGED) {
 + 		ath_dbg(common, ANY, "Device has been unplugged!\n");
-+@@ -2140,8 +2139,7 @@ void __ath9k_flush(struct ieee80211_hw *hw, u32 queues, bool drop,
++@@ -2238,8 +2237,7 @@ void __ath9k_flush(struct ieee80211_hw *
 + 		ath9k_ps_restore(sc);
 + 	}
 + 
 +-	ieee80211_queue_delayed_work(hw, &sc->hw_check_work,
-+-				     ATH_HW_CHECK_POLL_INT);
++-				     msecs_to_jiffies(ATH_HW_CHECK_POLL_INT));
 ++	ieee80211_queue_delayed_work(hw, &sc->tx_complete_work, 0);
 + }
 + 
 + static bool ath9k_tx_frames_pending(struct ieee80211_hw *hw)
-+diff --git a/drivers/net/wireless/ath/ath9k/xmit.c b/drivers/net/wireless/ath/ath9k/xmit.c
-+index a1a516407a60d75b03772c1853c88b678f935344..21fc71dce8fa0bde8793eb50f2161703256d087b 100644
 +--- a/drivers/net/wireless/ath/ath9k/xmit.c
 ++++ b/drivers/net/wireless/ath/ath9k/xmit.c
-+@@ -2876,6 +2876,8 @@ int ath_tx_init(struct ath_softc *sc, int nbufs)
++@@ -2837,6 +2837,8 @@ int ath_tx_init(struct ath_softc *sc, in
 + 		return error;
 + 	}
 + 
