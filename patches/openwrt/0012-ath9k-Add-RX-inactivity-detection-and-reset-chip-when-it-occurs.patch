@@ -1,0 +1,221 @@
+From: Toke Høiland-Jørgensen <toke@toke.dk>
+Date: Wed, 6 Nov 2024 13:41:44 +0100
+Subject: ath9k: Add RX inactivity detection and reset chip when it occurs
+
+Some ath9k chips can, seemingly at random, end up in a state which can
+be described as "deaf". No or nearly no interrupts are generated anymore
+for incoming packets. Existing links either break down after a while and
+new links will not be established.
+
+The circumstances leading to this "deafness" is still unclear, but some
+particular chips (especially 2-stream 11n SoCs, but also others) can go
+'deaf' when running AP or mesh (or both) after some time. It's probably
+a hardware issue, and doing a channel scan to trigger a chip
+reset (which one normally can't do on an AP interface) recovers the
+hardware.
+
+The only way the driver can detect this state, is by detecting if there
+has been no RX activity for a while. In this case we can proactively
+reset the chip (which only takes a small number of milliseconds, so
+shouldn't interrupt things too much if it has been idle for several
+seconds), which functions as a workaround.
+
+OpenWrt, and various derivatives, have been carrying versions of this
+workaround for years, that were never upstreamed. One version[0],
+written by Felix Fietkau, used a simple counter and only reset if there
+was precisely zero RX activity for a long period of time. This had the
+problem that in some cases a small number of interrupts would appear
+even if the device was otherwise not responsive. For this reason,
+another version[1], written by Simon Wunderlich and Sven Eckelmann, used
+a time-based approach to calculate the average number of RX interrupts
+over a longer (four-second) interval, and reset the chip when seeing
+less than one interrupt per second over this period. However, that
+version relied on debugfs counters to keep track of the number of
+interrupts, which means it didn't work at all if debugfs was not
+enabled.
+
+This patch unifies the two versions: it uses the same approach as Felix'
+patch to count the number of RX handler invocations, but uses the same
+time-based windowing approach as Simon and Sven's patch to still handle
+the case where occasional interrupts appear but the device is otherwise
+deaf.
+
+Since this is based on ideas by all three people, but not actually
+directly derived from any of the patches, I'm including Suggested-by
+tags from Simon, Sven and Felix below, which should hopefully serve as
+proper credit.
+
+[0] https://patchwork.kernel.org/project/linux-wireless/patch/20170125163654.66431-3-nbd@nbd.name/
+[1] https://patchwork.kernel.org/project/linux-wireless/patch/20161117083614.19188-2-sven.eckelmann@open-mesh.com/
+
+Suggested-by: Simon Wunderlich <sw@simonwunderlich.de>
+Suggested-by: Sven Eckelmann <se@simonwunderlich.de>
+Suggested-by: Felix Fietkau <nbd@nbd.name>
+Signed-off-by: Toke Høiland-Jørgensen <toke@toke.dk>
+Reviewed-by: Sven Eckelmann <se@simonwunderlich.de>
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/package/kernel/mac80211/patches/ath9k/554-ath9k-Add-RX-inactivity-detection-and-reset-chip-whe.patch b/package/kernel/mac80211/patches/ath9k/554-ath9k-Add-RX-inactivity-detection-and-reset-chip-whe.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..17b3ae9df72d20dfe4ac9070d3fb20cc66b716de
+--- /dev/null
++++ b/package/kernel/mac80211/patches/ath9k/554-ath9k-Add-RX-inactivity-detection-and-reset-chip-whe.patch
+@@ -0,0 +1,158 @@
++From: Toke Høiland-Jørgensen <toke@toke.dk>
++Date: Wed, 6 Nov 2024 13:41:44 +0100
++Subject: ath9k: Add RX inactivity detection and reset chip when it occurs
++
++Some ath9k chips can, seemingly at random, end up in a state which can
++be described as "deaf". No or nearly no interrupts are generated anymore
++for incoming packets. Existing links either break down after a while and
++new links will not be established.
++
++The circumstances leading to this "deafness" is still unclear, but some
++particular chips (especially 2-stream 11n SoCs, but also others) can go
++'deaf' when running AP or mesh (or both) after some time. It's probably
++a hardware issue, and doing a channel scan to trigger a chip
++reset (which one normally can't do on an AP interface) recovers the
++hardware.
++
++The only way the driver can detect this state, is by detecting if there
++has been no RX activity for a while. In this case we can proactively
++reset the chip (which only takes a small number of milliseconds, so
++shouldn't interrupt things too much if it has been idle for several
++seconds), which functions as a workaround.
++
++OpenWrt, and various derivatives, have been carrying versions of this
++workaround for years, that were never upstreamed. One version[0],
++written by Felix Fietkau, used a simple counter and only reset if there
++was precisely zero RX activity for a long period of time. This had the
++problem that in some cases a small number of interrupts would appear
++even if the device was otherwise not responsive. For this reason,
++another version[1], written by Simon Wunderlich and Sven Eckelmann, used
++a time-based approach to calculate the average number of RX interrupts
++over a longer (four-second) interval, and reset the chip when seeing
++less than one interrupt per second over this period. However, that
++version relied on debugfs counters to keep track of the number of
++interrupts, which means it didn't work at all if debugfs was not
++enabled.
++
++This patch unifies the two versions: it uses the same approach as Felix'
++patch to count the number of RX handler invocations, but uses the same
++time-based windowing approach as Simon and Sven's patch to still handle
++the case where occasional interrupts appear but the device is otherwise
++deaf.
++
++Since this is based on ideas by all three people, but not actually
++directly derived from any of the patches, I'm including Suggested-by
++tags from Simon, Sven and Felix below, which should hopefully serve as
++proper credit.
++
++[0] https://patchwork.kernel.org/project/linux-wireless/patch/20170125163654.66431-3-nbd@nbd.name/
++[1] https://patchwork.kernel.org/project/linux-wireless/patch/20161117083614.19188-2-sven.eckelmann@open-mesh.com/
++
++Suggested-by: Simon Wunderlich <sw@simonwunderlich.de>
++Suggested-by: Sven Eckelmann <se@simonwunderlich.de>
++Suggested-by: Felix Fietkau <nbd@nbd.name>
++Signed-off-by: Toke Høiland-Jørgensen <toke@toke.dk>
++Reviewed-by: Sven Eckelmann <se@simonwunderlich.de>
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++diff --git a/drivers/net/wireless/ath/ath9k/ath9k.h b/drivers/net/wireless/ath/ath9k/ath9k.h
++index 49c9596e6edbedb6f0a298573ff5b1518b60b300..dea42d3ad15d613451f6618a04a43636d240a931 100644
++--- a/drivers/net/wireless/ath/ath9k/ath9k.h
+++++ b/drivers/net/wireless/ath/ath9k/ath9k.h
++@@ -1039,6 +1039,8 @@ struct ath_softc {
++ 
++ 	u8 gtt_cnt;
++ 	u32 intrstatus;
+++	u32 rx_active_check_time;
+++	u32 rx_active_count;
++ 	u16 ps_flags; /* PS_* */
++ 	bool ps_enabled;
++ 	bool ps_idle;
++diff --git a/drivers/net/wireless/ath/ath9k/debug.c b/drivers/net/wireless/ath/ath9k/debug.c
++index 4665a20b9b0666f23ef190ed4e2387cea350af1a..5b504a5dfbded71710f80e1299bcd30584d95ab8 100644
++--- a/drivers/net/wireless/ath/ath9k/debug.c
+++++ b/drivers/net/wireless/ath/ath9k/debug.c
++@@ -765,6 +765,7 @@ static int read_file_reset(struct seq_file *file, void *data)
++ 		[RESET_TYPE_CALIBRATION] = "Calibration error",
++ 		[RESET_TX_DMA_ERROR] = "Tx DMA stop error",
++ 		[RESET_RX_DMA_ERROR] = "Rx DMA stop error",
+++		[RESET_TYPE_RX_INACTIVE] = "Rx path inactive",
++ 	};
++ 	int i;
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/debug.h b/drivers/net/wireless/ath/ath9k/debug.h
++index 2a122e0db8af057acb64937f20f4d38788990d71..fdf992deb90be5677d4302dd4785ec4c797fc09d 100644
++--- a/drivers/net/wireless/ath/ath9k/debug.h
+++++ b/drivers/net/wireless/ath/ath9k/debug.h
++@@ -53,6 +53,7 @@ enum ath_reset_type {
++ 	RESET_TYPE_CALIBRATION,
++ 	RESET_TX_DMA_ERROR,
++ 	RESET_RX_DMA_ERROR,
+++	RESET_TYPE_RX_INACTIVE,
++ 	__RESET_TYPE_MAX
++ };
++ 
++diff --git a/drivers/net/wireless/ath/ath9k/link.c b/drivers/net/wireless/ath/ath9k/link.c
++index 9d84003db800e9513f07ee85a4203dbb7636edf0..fcc346c46d01ff4bedb3695b14c3e53873931f83 100644
++--- a/drivers/net/wireless/ath/ath9k/link.c
+++++ b/drivers/net/wireless/ath/ath9k/link.c
++@@ -50,7 +50,36 @@ reset:
++ 		"tx hung, resetting the chip\n");
++ 	ath9k_queue_reset(sc, RESET_TYPE_TX_HANG);
++ 	return false;
+++}
++ 
+++#define RX_INACTIVE_CHECK_INTERVAL (4 * MSEC_PER_SEC)
+++
+++static bool ath_hw_rx_inactive_check(struct ath_softc *sc)
+++{
+++	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
+++	u32 interval, count;
+++
+++	interval = jiffies_to_msecs(jiffies - sc->rx_active_check_time);
+++	count = sc->rx_active_count;
+++
+++	if (interval < RX_INACTIVE_CHECK_INTERVAL)
+++		return true; /* too soon to check */
+++
+++	sc->rx_active_count = 0;
+++	sc->rx_active_check_time = jiffies;
+++
+++	/* Need at least one interrupt per second, and we should only react if
+++	 * we are within a factor two of the expected interval
+++	 */
+++	if (interval > RX_INACTIVE_CHECK_INTERVAL * 2 ||
+++	    count >= interval / MSEC_PER_SEC)
+++		return true;
+++
+++	ath_dbg(common, RESET,
+++		"RX inactivity detected. Schedule chip reset\n");
+++	ath9k_queue_reset(sc, RESET_TYPE_RX_INACTIVE);
+++
+++	return false;
++ }
++ 
++ void ath_hw_check_work(struct work_struct *work)
++@@ -58,8 +87,8 @@ void ath_hw_check_work(struct work_struct *work)
++ 	struct ath_softc *sc = container_of(work, struct ath_softc,
++ 					    hw_check_work.work);
++ 
++-	if (!ath_hw_check(sc) ||
++-	    !ath_tx_complete_check(sc))
+++	if (!ath_hw_check(sc) || !ath_tx_complete_check(sc) ||
+++	    !ath_hw_rx_inactive_check(sc))
++ 		return;
++ 
++ 	ieee80211_queue_delayed_work(sc->hw, &sc->hw_check_work,
++diff --git a/drivers/net/wireless/ath/ath9k/main.c b/drivers/net/wireless/ath/ath9k/main.c
++index 9b186ab30214658fa5b26b1f0ca778309af34600..697a9658490950df64418f392db885c5b087cc97 100644
++--- a/drivers/net/wireless/ath/ath9k/main.c
+++++ b/drivers/net/wireless/ath/ath9k/main.c
++@@ -454,6 +454,7 @@ void ath9k_tasklet(struct tasklet_struct *t)
++ 			ath_rx_tasklet(sc, 0, true);
++ 
++ 		ath_rx_tasklet(sc, 0, false);
+++		sc->rx_active_count++;
++ 	}
++ 
++ 	if (status & ATH9K_INT_TX) {
