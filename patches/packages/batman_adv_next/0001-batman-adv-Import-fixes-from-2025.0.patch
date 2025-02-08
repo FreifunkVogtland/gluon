@@ -1,0 +1,913 @@
+From: Sven Eckelmann <sven@narfation.org>
+Date: Sat, 8 Feb 2025 11:44:44 +0100
+Subject: batman-adv: Import fixes from 2025.0
+
+Signed-off-by: Sven Eckelmann <sven@narfation.org>
+
+diff --git a/batman-adv/patches/5000-batman-adv-Avoid-infinite-loop-trying-to-resize-loca.patch b/batman-adv/patches/5000-batman-adv-Avoid-infinite-loop-trying-to-resize-loca.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..cc3645897f936c2c63ae96a4c20e529b21b1a8b5
+--- /dev/null
++++ b/batman-adv/patches/5000-batman-adv-Avoid-infinite-loop-trying-to-resize-loca.patch
+@@ -0,0 +1,60 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Mon, 12 Feb 2024 14:32:13 +0100
++Subject: batman-adv: Avoid infinite loop trying to resize local TT
++
++If the MTU of one of an attached interface becomes too small to transmit
++the local translation table then it must be resized to fit inside all
++fragments (when enabled) or a single packet.
++
++But if the MTU becomes too low to transmit even the header + the VLAN
++specific part then the resizing of the local TT will never succeed. This
++can for example happen when the usable space is 110 bytes and 11 VLANs are
++on top of batman-adv. In this case, at least 116 byte would be needed.
++There will just be an endless spam of
++
++   batman_adv: batadv0: Forced to purge local tt entries to fit new maximum fragment MTU (110)
++
++in the log but the function will never finish. Problem here is that the
++timeout will be halved all the time and will then stagnate at 0 and
++therefore never be able to reduce the table even more.
++
++There are other scenarios possible with a similar result. The number of
++BATADV_TT_CLIENT_NOPURGE entries in the local TT can for example be too
++high to fit inside a packet. Such a scenario can therefore happen also with
++only a single VLAN + 7 non-purgable addresses - requiring at least 120
++bytes.
++
++While this should be handled proactively when:
++
++* interface with too low MTU is added
++* VLAN is added
++* non-purgeable local mac is added
++* MTU of an attached interface is reduced
++* fragmentation setting gets disabled (which most likely requires dropping
++  attached interfaces)
++
++not all of these scenarios can be prevented because batman-adv is only
++consuming events without the the possibility to prevent these actions
++(non-purgable MAC address added, MTU of an attached interface is reduced).
++It is therefore necessary to also make sure that the code is able to handle
++also the situations when there were already incompatible system
++configuration are present.
++
++Cc: stable@vger.kernel.org
++Fixes: f7f2fe494388 ("batman-adv: limit local translation table max size")
++Reported-by: syzbot+a6a4b5bb3da165594cff@syzkaller.appspotmail.com
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++
++diff --git a/net/batman-adv/translation-table.c b/net/batman-adv/translation-table.c
++index 04af36b136e18bf15be3a9ab82ac887ace994bb5..e40c4b51e9b9aef28b2e2df44a64c8f5752c7d8f 100644
++--- a/net/batman-adv/translation-table.c
+++++ b/net/batman-adv/translation-table.c
++@@ -3948,7 +3948,7 @@ void batadv_tt_local_resize_to_mtu(struct net_device *soft_iface)
++ 
++ 	spin_lock_bh(&bat_priv->tt.commit_lock);
++ 
++-	while (true) {
+++	while (timeout) {
++ 		table_size = batadv_tt_local_table_transmit_size(bat_priv);
++ 		if (packet_size_max >= table_size)
++ 			break;
+diff --git a/batman-adv/patches/5001-batman-adv-Don-t-accept-TT-entries-for-out-of-spec-V.patch b/batman-adv/patches/5001-batman-adv-Don-t-accept-TT-entries-for-out-of-spec-V.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..6d9ffc28bf17170062afa04d66c868d41fc2d936
+--- /dev/null
++++ b/batman-adv/patches/5001-batman-adv-Don-t-accept-TT-entries-for-out-of-spec-V.patch
+@@ -0,0 +1,81 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Sat, 4 May 2024 22:27:21 +0200
++Subject: batman-adv: Don't accept TT entries for out-of-spec VIDs
++
++The internal handling of VLAN IDs in batman-adv is only specified for
++following encodings:
++
++* VLAN is used
++  - bit 15 is 1
++  - bit 11 - bit 0 is the VLAN ID (0-4095)
++  - remaining bits are 0
++* No VLAN is used
++  - bit 15 is 0
++  - remaining bits are 0
++
++batman-adv was only preparing new translation table entries (based on its
++soft interface information) using this encoding format. But the receive
++path was never checking if entries in the roam or TT TVLVs were also
++following this encoding.
++
++It was therefore possible to create more than the expected maximum of 4096
+++ 1 entries in the originator VLAN list. Simply by setting the "remaining
++bits" to "random" values in corresponding TVLV.
++
++Fixes: 21a57f6e7a3b ("batman-adv: make the TT CRC logic VLAN specific")
++Reported-by: Linus Lüssing <linus.luessing@c0d3.blue>
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++(cherry picked from commit aa68ccb56023394b08929718645760dcc501f2d9)
++
++diff --git a/net/batman-adv/originator.c b/net/batman-adv/originator.c
++index 469b1b5367ac332524395279cd3935590f2ed72e..455fd010918681a8231bfc09acd21b8cebfefe41 100644
++--- a/net/batman-adv/originator.c
+++++ b/net/batman-adv/originator.c
++@@ -11,6 +11,7 @@
++ #include <linux/errno.h>
++ #include <linux/etherdevice.h>
++ #include <linux/gfp.h>
+++#include <linux/if_vlan.h>
++ #include <linux/jiffies.h>
++ #include <linux/kernel.h>
++ #include <linux/kref.h>
++@@ -131,6 +132,29 @@ batadv_orig_node_vlan_get(struct batadv_orig_node *orig_node,
++ 	return vlan;
++ }
++ 
+++/**
+++ * batadv_vlan_id_valid() - check if vlan id is in valid batman-adv encoding
+++ * @vid: the VLAN identifier
+++ *
+++ * Return: true when either no vlan is set or if VLAN is in correct range,
+++ *  false otherwise
+++ */
+++static bool batadv_vlan_id_valid(unsigned short vid)
+++{
+++	unsigned short non_vlan = vid & ~(BATADV_VLAN_HAS_TAG | VLAN_VID_MASK);
+++
+++	if (vid == 0)
+++		return true;
+++
+++	if (!(vid & BATADV_VLAN_HAS_TAG))
+++		return false;
+++
+++	if (non_vlan)
+++		return false;
+++
+++	return true;
+++}
+++
++ /**
++  * batadv_orig_node_vlan_new() - search and possibly create an orig_node_vlan
++  *  object
++@@ -149,6 +173,9 @@ batadv_orig_node_vlan_new(struct batadv_orig_node *orig_node,
++ {
++ 	struct batadv_orig_node_vlan *vlan;
++ 
+++	if (!batadv_vlan_id_valid(vid))
+++		return NULL;
+++
++ 	spin_lock_bh(&orig_node->vlan_list_lock);
++ 
++ 	/* first look if an object for this vid already exists */
+diff --git a/batman-adv/patches/5002-batman-adv-Fix-wrong-singular-form-of-jiffies-in-com.patch b/batman-adv/patches/5002-batman-adv-Fix-wrong-singular-form-of-jiffies-in-com.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca012f61d67f8f4de4af3caa64e45ca17a5ef54f
+--- /dev/null
++++ b/batman-adv/patches/5002-batman-adv-Fix-wrong-singular-form-of-jiffies-in-com.patch
+@@ -0,0 +1,29 @@
++From: Anna-Maria Behnsen <anna-maria@linutronix.de>
++Date: Wed, 4 Sep 2024 15:04:53 +0200
++Subject: batman-adv: Fix wrong singular form of jiffies in comments
++
++There are several comments all over the place, which uses a wrong singular
++form of jiffies.
++
++Replace 'jiffie' by 'jiffy'. No functional change.
++
++Signed-off-by: Anna-Maria Behnsen <anna-maria@linutronix.de>
++Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
++Acked-by: Geert Uytterhoeven <geert@linux-m68k.org> # m68k
++Link: https://lore.kernel.org/all/20240904-devel-anna-maria-b4-timers-flseep-v1-3-e98760256370@linutronix.de
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++(cherry picked from commit e242f83f6649052e7393c689df20b1d03ac9df5b)
++
++diff --git a/net/batman-adv/types.h b/net/batman-adv/types.h
++index f40ba4bd8634748e3de79ab06e189b844fe738f6..72d1eda00ddb4ee8d21aafc0177e8aeeeff68673 100644
++--- a/net/batman-adv/types.h
+++++ b/net/batman-adv/types.h
++@@ -287,7 +287,7 @@ struct batadv_frag_table_entry {
++ 	/** @lock: lock to protect the list of fragments */
++ 	spinlock_t lock;
++ 
++-	/** @timestamp: time (jiffie) of last received fragment */
+++	/** @timestamp: time (jiffy) of last received fragment */
++ 	unsigned long timestamp;
++ 
++ 	/** @seqno: sequence number of the fragments in the list */
+diff --git a/batman-adv/patches/5003-batman-adv-Do-not-send-uninitialized-TT-changes.patch b/batman-adv/patches/5003-batman-adv-Do-not-send-uninitialized-TT-changes.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e842c6ad9f5e7174918b35fff000d6a1047b544
+--- /dev/null
++++ b/batman-adv/patches/5003-batman-adv-Do-not-send-uninitialized-TT-changes.patch
+@@ -0,0 +1,66 @@
++From: Remi Pommarel <repk@triplefau.lt>
++Date: Fri, 22 Nov 2024 16:52:48 +0100
++Subject: batman-adv: Do not send uninitialized TT changes
++
++The number of TT changes can be less than initially expected in
++batadv_tt_tvlv_container_update() (changes can be removed by
++batadv_tt_local_event() in ADD+DEL sequence between reading
++tt_diff_entries_num and actually iterating the change list under lock).
++
++Thus tt_diff_len could be bigger than the actual changes size that need
++to be sent. Because batadv_send_my_tt_response sends the whole
++packet, uninitialized data can be interpreted as TT changes on other
++nodes leading to weird TT global entries on those nodes such as:
++
++ * 00:00:00:00:00:00   -1 [....] (  0) 88:12:4e:ad:7e:ba (179) (0x45845380)
++ * 00:00:00:00:78:79 4092 [.W..] (  0) 88:12:4e:ad:7e:3c (145) (0x8ebadb8b)
++
++All of the above also applies to OGM tvlv container buffer's tvlv_len.
++
++Remove the extra allocated space to avoid sending uninitialized TT
++changes in batadv_send_my_tt_response() and batadv_v_ogm_send_softif().
++
++Fixes: 8405301b9794 ("batman-adv: tvlv - convert tt data sent within OGMs")
++Signed-off-by: Remi Pommarel <repk@triplefau.lt>
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++(cherry picked from commit 5fe3a7a48ea6374280dc855db7b802d70b1870c6)
++
++diff --git a/net/batman-adv/translation-table.c b/net/batman-adv/translation-table.c
++index e40c4b51e9b9aef28b2e2df44a64c8f5752c7d8f..79ebfbcd2c9f62f753d1c71609d3306545541edd 100644
++--- a/net/batman-adv/translation-table.c
+++++ b/net/batman-adv/translation-table.c
++@@ -990,6 +990,7 @@ static void batadv_tt_tvlv_container_update(struct batadv_priv *bat_priv)
++ 	int tt_diff_len, tt_change_len = 0;
++ 	int tt_diff_entries_num = 0;
++ 	int tt_diff_entries_count = 0;
+++	size_t tt_extra_len = 0;
++ 	u16 tvlv_len;
++ 
++ 	tt_diff_entries_num = atomic_read(&bat_priv->tt.local_changes);
++@@ -1027,6 +1028,9 @@ static void batadv_tt_tvlv_container_update(struct batadv_priv *bat_priv)
++ 	}
++ 	spin_unlock_bh(&bat_priv->tt.changes_list_lock);
++ 
+++	tt_extra_len = batadv_tt_len(tt_diff_entries_num -
+++				     tt_diff_entries_count);
+++
++ 	/* Keep the buffer for possible tt_request */
++ 	spin_lock_bh(&bat_priv->tt.last_changeset_lock);
++ 	kfree(bat_priv->tt.last_changeset);
++@@ -1035,6 +1039,7 @@ static void batadv_tt_tvlv_container_update(struct batadv_priv *bat_priv)
++ 	tt_change_len = batadv_tt_len(tt_diff_entries_count);
++ 	/* check whether this new OGM has no changes due to size problems */
++ 	if (tt_diff_entries_count > 0) {
+++		tt_diff_len -= tt_extra_len;
++ 		/* if kmalloc() fails we will reply with the full table
++ 		 * instead of providing the diff
++ 		 */
++@@ -1047,6 +1052,8 @@ static void batadv_tt_tvlv_container_update(struct batadv_priv *bat_priv)
++ 	}
++ 	spin_unlock_bh(&bat_priv->tt.last_changeset_lock);
++ 
+++	/* Remove extra packet space for OGM */
+++	tvlv_len -= tt_extra_len;
++ container_register:
++ 	batadv_tvlv_container_register(bat_priv, BATADV_TVLV_TT, 1, tt_data,
++ 				       tvlv_len);
+diff --git a/batman-adv/patches/5004-batman-adv-Remove-uninitialized-data-in-full-table-T.patch b/batman-adv/patches/5004-batman-adv-Remove-uninitialized-data-in-full-table-T.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..579b3c21f145a1ef475fef7471cb9fdaccc7cafc
+--- /dev/null
++++ b/batman-adv/patches/5004-batman-adv-Remove-uninitialized-data-in-full-table-T.patch
+@@ -0,0 +1,103 @@
++From: Remi Pommarel <repk@triplefau.lt>
++Date: Fri, 22 Nov 2024 16:52:49 +0100
++Subject: batman-adv: Remove uninitialized data in full table TT response
++
++The number of entries filled by batadv_tt_tvlv_generate() can be less
++than initially expected in batadv_tt_prepare_tvlv_{global,local}_data()
++(changes can be removed by batadv_tt_local_event() in ADD+DEL sequence
++in the meantime as the lock held during the whole tvlv global/local data
++generation).
++
++Thus tvlv_len could be bigger than the actual TT entry size that need
++to be sent so full table TT_RESPONSE could hold invalid TT entries such
++as below.
++
++ * 00:00:00:00:00:00   -1 [....] (  0) 88:12:4e:ad:7e:ba (179) (0x45845380)
++ * 00:00:00:00:78:79 4092 [.W..] (  0) 88:12:4e:ad:7e:3c (145) (0x8ebadb8b)
++
++Remove the extra allocated space to avoid sending uninitialized entries
++for full table TT_RESPONSE in both batadv_send_other_tt_response() and
++batadv_send_my_tt_response().
++
++Fixes: 21a57f6e7a3b ("batman-adv: make the TT CRC logic VLAN specific")
++Signed-off-by: Remi Pommarel <repk@triplefau.lt>
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++(cherry picked from commit 095c3965bdc29e43546a9cdd21f179f952e01f48)
++
++diff --git a/net/batman-adv/translation-table.c b/net/batman-adv/translation-table.c
++index 79ebfbcd2c9f62f753d1c71609d3306545541edd..e11182ab748785521707a6db211c6afefd51038d 100644
++--- a/net/batman-adv/translation-table.c
+++++ b/net/batman-adv/translation-table.c
++@@ -2754,14 +2754,16 @@ static bool batadv_tt_global_valid(const void *entry_ptr,
++  *
++  * Fills the tvlv buff with the tt entries from the specified hash. If valid_cb
++  * is not provided then this becomes a no-op.
+++ *
+++ * Return: Remaining unused length in tvlv_buff.
++  */
++-static void batadv_tt_tvlv_generate(struct batadv_priv *bat_priv,
++-				    struct batadv_hashtable *hash,
++-				    void *tvlv_buff, u16 tt_len,
++-				    bool (*valid_cb)(const void *,
++-						     const void *,
++-						     u8 *flags),
++-				    void *cb_data)
+++static u16 batadv_tt_tvlv_generate(struct batadv_priv *bat_priv,
+++				   struct batadv_hashtable *hash,
+++				   void *tvlv_buff, u16 tt_len,
+++				   bool (*valid_cb)(const void *,
+++						    const void *,
+++						    u8 *flags),
+++				   void *cb_data)
++ {
++ 	struct batadv_tt_common_entry *tt_common_entry;
++ 	struct batadv_tvlv_tt_change *tt_change;
++@@ -2775,7 +2777,7 @@ static void batadv_tt_tvlv_generate(struct batadv_priv *bat_priv,
++ 	tt_change = tvlv_buff;
++ 
++ 	if (!valid_cb)
++-		return;
+++		return tt_len;
++ 
++ 	rcu_read_lock();
++ 	for (i = 0; i < hash->size; i++) {
++@@ -2801,6 +2803,8 @@ static void batadv_tt_tvlv_generate(struct batadv_priv *bat_priv,
++ 		}
++ 	}
++ 	rcu_read_unlock();
+++
+++	return batadv_tt_len(tt_tot - tt_num_entries);
++ }
++ 
++ /**
++@@ -3076,10 +3080,11 @@ static bool batadv_send_other_tt_response(struct batadv_priv *bat_priv,
++ 			goto out;
++ 
++ 		/* fill the rest of the tvlv with the real TT entries */
++-		batadv_tt_tvlv_generate(bat_priv, bat_priv->tt.global_hash,
++-					tt_change, tt_len,
++-					batadv_tt_global_valid,
++-					req_dst_orig_node);
+++		tvlv_len -= batadv_tt_tvlv_generate(bat_priv,
+++						    bat_priv->tt.global_hash,
+++						    tt_change, tt_len,
+++						    batadv_tt_global_valid,
+++						    req_dst_orig_node);
++ 	}
++ 
++ 	/* Don't send the response, if larger than fragmented packet. */
++@@ -3203,9 +3208,11 @@ static bool batadv_send_my_tt_response(struct batadv_priv *bat_priv,
++ 			goto out;
++ 
++ 		/* fill the rest of the tvlv with the real TT entries */
++-		batadv_tt_tvlv_generate(bat_priv, bat_priv->tt.local_hash,
++-					tt_change, tt_len,
++-					batadv_tt_local_valid, NULL);
+++		tvlv_len -= batadv_tt_tvlv_generate(bat_priv,
+++						    bat_priv->tt.local_hash,
+++						    tt_change, tt_len,
+++						    batadv_tt_local_valid,
+++						    NULL);
++ 	}
++ 
++ 	tvlv_tt_data->flags = BATADV_TT_RESPONSE;
+diff --git a/batman-adv/patches/5005-batman-adv-Do-not-let-TT-changes-list-grows-indefini.patch b/batman-adv/patches/5005-batman-adv-Do-not-let-TT-changes-list-grows-indefini.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..66eced2cc8ca9af915c2aca0784b8fb23bc4059f
+--- /dev/null
++++ b/batman-adv/patches/5005-batman-adv-Do-not-let-TT-changes-list-grows-indefini.patch
+@@ -0,0 +1,65 @@
++From: Remi Pommarel <repk@triplefau.lt>
++Date: Fri, 22 Nov 2024 16:52:50 +0100
++Subject: batman-adv: Do not let TT changes list grows indefinitely
++
++When TT changes list is too big to fit in packet due to MTU size, an
++empty OGM is sent expected other node to send TT request to get the
++changes. The issue is that tt.last_changeset was not built thus the
++originator was responding with previous changes to those TT requests
++(see batadv_send_my_tt_response). Also the changes list was never
++cleaned up effectively never ending growing from this point onwards,
++repeatedly sending the same TT response changes over and over, and
++creating a new empty OGM every OGM interval expecting for the local
++changes to be purged.
++
++When there is more TT changes that can fit in packet, drop all changes,
++send empty OGM and wait for TT request so we can respond with a full
++table instead.
++
++Fixes: 8405301b9794 ("batman-adv: tvlv - convert tt data sent within OGMs")
++Signed-off-by: Remi Pommarel <repk@triplefau.lt>
++Acked-by: Antonio Quartulli <Antonio@mandelbit.com>
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++(cherry picked from commit 4d49d6e9d60c41a6da727108518cb8fb33295537)
++
++diff --git a/net/batman-adv/translation-table.c b/net/batman-adv/translation-table.c
++index e11182ab748785521707a6db211c6afefd51038d..07118ab33697418214a7a3aba3d9a7d4f4fa4e92 100644
++--- a/net/batman-adv/translation-table.c
+++++ b/net/batman-adv/translation-table.c
++@@ -990,6 +990,7 @@ static void batadv_tt_tvlv_container_update(struct batadv_priv *bat_priv)
++ 	int tt_diff_len, tt_change_len = 0;
++ 	int tt_diff_entries_num = 0;
++ 	int tt_diff_entries_count = 0;
+++	bool drop_changes = false;
++ 	size_t tt_extra_len = 0;
++ 	u16 tvlv_len;
++ 
++@@ -997,10 +998,17 @@ static void batadv_tt_tvlv_container_update(struct batadv_priv *bat_priv)
++ 	tt_diff_len = batadv_tt_len(tt_diff_entries_num);
++ 
++ 	/* if we have too many changes for one packet don't send any
++-	 * and wait for the tt table request which will be fragmented
+++	 * and wait for the tt table request so we can reply with the full
+++	 * (fragmented) table.
+++	 *
+++	 * The local change history should still be cleaned up so the next
+++	 * TT round can start again with a clean state.
++ 	 */
++-	if (tt_diff_len > bat_priv->soft_iface->mtu)
+++	if (tt_diff_len > bat_priv->soft_iface->mtu) {
++ 		tt_diff_len = 0;
+++		tt_diff_entries_num = 0;
+++		drop_changes = true;
+++	}
++ 
++ 	tvlv_len = batadv_tt_prepare_tvlv_local_data(bat_priv, &tt_data,
++ 						     &tt_change, &tt_diff_len);
++@@ -1009,7 +1017,7 @@ static void batadv_tt_tvlv_container_update(struct batadv_priv *bat_priv)
++ 
++ 	tt_data->flags = BATADV_TT_OGM_DIFF;
++ 
++-	if (tt_diff_len == 0)
+++	if (!drop_changes && tt_diff_len == 0)
++ 		goto container_register;
++ 
++ 	spin_lock_bh(&bat_priv->tt.changes_list_lock);
+diff --git a/batman-adv/patches/5006-batman-adv-fix-panic-during-interface-removal.patch b/batman-adv/patches/5006-batman-adv-fix-panic-during-interface-removal.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..20c12bd3beecd6761687a8b347937720b5d8d5e4
+--- /dev/null
++++ b/batman-adv/patches/5006-batman-adv-fix-panic-during-interface-removal.patch
+@@ -0,0 +1,73 @@
++From: Andy Strohman <andrew@andrewstrohman.com>
++Date: Thu, 9 Jan 2025 02:27:56 +0000
++Subject: batman-adv: fix panic during interface removal
++
++Reference counting is used to ensure that
++batadv_hardif_neigh_node and batadv_hard_iface
++are not freed before/during
++batadv_v_elp_throughput_metric_update work is
++finished.
++
++But there isn't a guarantee that the hard if will
++remain associated with a soft interface up until
++the work is finished.
++
++This fixes a crash triggered by reboot that looks
++like this:
++
++Call trace:
++ batadv_v_mesh_free+0xd0/0x4dc [batman_adv]
++ batadv_v_elp_throughput_metric_update+0x1c/0xa4
++ process_one_work+0x178/0x398
++ worker_thread+0x2e8/0x4d0
++ kthread+0xd8/0xdc
++ ret_from_fork+0x10/0x20
++
++(the batadv_v_mesh_free call is misleading,
++and does not actually happen)
++
++I was able to make the issue happen more reliably
++by changing hardif_neigh->bat_v.metric_work work
++to be delayed work. This allowed me to track down
++and confirm the fix.
++
++Fixes: 5c3245172c01 ("batman-adv: ELP - compute the metric based on the estimated throughput")
++Signed-off-by: Andy Strohman <andrew@andrewstrohman.com>
++[sven@narfation.org: prevent entering batadv_v_elp_get_throughput without
++ soft_iface]
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++(cherry picked from commit 1d7c8ac629678b8cd23ef9def7c7b111cb9e8ed5)
++
++diff --git a/net/batman-adv/bat_v_elp.c b/net/batman-adv/bat_v_elp.c
++index c8b4f46e03e348e63cb59dda4f978953de25b5da..cfd9368dccc57fee2347b82f91ab95682f8cf828 100644
++--- a/net/batman-adv/bat_v_elp.c
+++++ b/net/batman-adv/bat_v_elp.c
++@@ -68,12 +68,19 @@ static void batadv_v_elp_start_timer(struct batadv_hard_iface *hard_iface)
++ static u32 batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh)
++ {
++ 	struct batadv_hard_iface *hard_iface = neigh->if_incoming;
+++	struct net_device *soft_iface = hard_iface->soft_iface;
++ 	struct ethtool_link_ksettings link_settings;
++ 	struct net_device *real_netdev;
++ 	struct station_info sinfo;
++ 	u32 throughput;
++ 	int ret;
++ 
+++	/* don't query throughput when no longer associated with any
+++	 * batman-adv interface
+++	 */
+++	if (!soft_iface)
+++		return BATADV_THROUGHPUT_DEFAULT_VALUE;
+++
++ 	/* if the user specified a customised value for this interface, then
++ 	 * return it directly
++ 	 */
++@@ -143,7 +150,7 @@ static u32 batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh)
++ 
++ default_throughput:
++ 	if (!(hard_iface->bat_v.flags & BATADV_WARNING_DEFAULT)) {
++-		batadv_info(hard_iface->soft_iface,
+++		batadv_info(soft_iface,
++ 			    "WiFi driver or ethtool info does not provide information about link speeds on interface %s, therefore defaulting to hardcoded throughput values of %u.%1u Mbps. Consider overriding the throughput manually or checking your driver.\n",
++ 			    hard_iface->net_dev->name,
++ 			    BATADV_THROUGHPUT_DEFAULT_VALUE / 10,
+diff --git a/batman-adv/patches/5007-batman-adv-Ignore-neighbor-throughput-metrics-in-err.patch b/batman-adv/patches/5007-batman-adv-Ignore-neighbor-throughput-metrics-in-err.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..4db04aefdfb84ba48d39cd90a06b731cb83a9084
+--- /dev/null
++++ b/batman-adv/patches/5007-batman-adv-Ignore-neighbor-throughput-metrics-in-err.patch
+@@ -0,0 +1,129 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Wed, 22 Jan 2025 21:51:20 +0100
++Subject: batman-adv: Ignore neighbor throughput metrics in error case
++
++If a temporary error happened in the evaluation of the neighbor throughput
++information, then the invalid throughput result should not be stored in the
++throughtput EWMA.
++
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++(cherry picked from commit ce8b40b7bdcc7f011191acda4c2d3067566eef54)
++
++diff --git a/net/batman-adv/bat_v_elp.c b/net/batman-adv/bat_v_elp.c
++index cfd9368dccc57fee2347b82f91ab95682f8cf828..ed933b78c2fccdc81c3aff8854db6790477347e5 100644
++--- a/net/batman-adv/bat_v_elp.c
+++++ b/net/batman-adv/bat_v_elp.c
++@@ -61,11 +61,13 @@ static void batadv_v_elp_start_timer(struct batadv_hard_iface *hard_iface)
++ /**
++  * batadv_v_elp_get_throughput() - get the throughput towards a neighbour
++  * @neigh: the neighbour for which the throughput has to be obtained
+++ * @pthroughput: calculated throughput towards the given neighbour in multiples
+++ *  of 100kpbs (a value of '1' equals 0.1Mbps, '10' equals 1Mbps, etc).
++  *
++- * Return: The throughput towards the given neighbour in multiples of 100kpbs
++- *         (a value of '1' equals 0.1Mbps, '10' equals 1Mbps, etc).
+++ * Return: true when value behind @pthroughput was set
++  */
++-static u32 batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh)
+++static bool batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh,
+++					u32 *pthroughput)
++ {
++ 	struct batadv_hard_iface *hard_iface = neigh->if_incoming;
++ 	struct net_device *soft_iface = hard_iface->soft_iface;
++@@ -79,14 +81,16 @@ static u32 batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh)
++ 	 * batman-adv interface
++ 	 */
++ 	if (!soft_iface)
++-		return BATADV_THROUGHPUT_DEFAULT_VALUE;
+++		return false;
++ 
++ 	/* if the user specified a customised value for this interface, then
++ 	 * return it directly
++ 	 */
++ 	throughput =  atomic_read(&hard_iface->bat_v.throughput_override);
++-	if (throughput != 0)
++-		return throughput;
+++	if (throughput != 0) {
+++		*pthroughput = throughput;
+++		return true;
+++	}
++ 
++ 	/* if this is a wireless device, then ask its throughput through
++ 	 * cfg80211 API
++@@ -113,19 +117,24 @@ static u32 batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh)
++ 			 * possible to delete this neighbor. For now set
++ 			 * the throughput metric to 0.
++ 			 */
++-			return 0;
+++			*pthroughput = 0;
+++			return true;
++ 		}
++ 		if (ret)
++ 			goto default_throughput;
++ 
++-		if (sinfo.filled & BIT(NL80211_STA_INFO_EXPECTED_THROUGHPUT))
++-			return sinfo.expected_throughput / 100;
+++		if (sinfo.filled & BIT(NL80211_STA_INFO_EXPECTED_THROUGHPUT)) {
+++			*pthroughput = sinfo.expected_throughput / 100;
+++			return true;
+++		}
++ 
++ 		/* try to estimate the expected throughput based on reported tx
++ 		 * rates
++ 		 */
++-		if (sinfo.filled & BIT(NL80211_STA_INFO_TX_BITRATE))
++-			return cfg80211_calculate_bitrate(&sinfo.txrate) / 3;
+++		if (sinfo.filled & BIT(NL80211_STA_INFO_TX_BITRATE)) {
+++			*pthroughput = cfg80211_calculate_bitrate(&sinfo.txrate) / 3;
+++			return true;
+++		}
++ 
++ 		goto default_throughput;
++ 	}
++@@ -144,8 +153,10 @@ static u32 batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh)
++ 			hard_iface->bat_v.flags &= ~BATADV_FULL_DUPLEX;
++ 
++ 		throughput = link_settings.base.speed;
++-		if (throughput && throughput != SPEED_UNKNOWN)
++-			return throughput * 10;
+++		if (throughput && throughput != SPEED_UNKNOWN) {
+++			*pthroughput = throughput * 10;
+++			return true;
+++		}
++ 	}
++ 
++ default_throughput:
++@@ -159,7 +170,8 @@ static u32 batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh)
++ 	}
++ 
++ 	/* if none of the above cases apply, return the base_throughput */
++-	return BATADV_THROUGHPUT_DEFAULT_VALUE;
+++	*pthroughput = BATADV_THROUGHPUT_DEFAULT_VALUE;
+++	return true;
++ }
++ 
++ /**
++@@ -171,15 +183,21 @@ void batadv_v_elp_throughput_metric_update(struct work_struct *work)
++ {
++ 	struct batadv_hardif_neigh_node_bat_v *neigh_bat_v;
++ 	struct batadv_hardif_neigh_node *neigh;
+++	u32 throughput;
+++	bool valid;
++ 
++ 	neigh_bat_v = container_of(work, struct batadv_hardif_neigh_node_bat_v,
++ 				   metric_work);
++ 	neigh = container_of(neigh_bat_v, struct batadv_hardif_neigh_node,
++ 			     bat_v);
++ 
++-	ewma_throughput_add(&neigh->bat_v.throughput,
++-			    batadv_v_elp_get_throughput(neigh));
+++	valid = batadv_v_elp_get_throughput(neigh, &throughput);
+++	if (!valid)
+++		goto put_neigh;
++ 
+++	ewma_throughput_add(&neigh->bat_v.throughput, throughput);
+++
+++put_neigh:
++ 	/* decrement refcounter to balance increment performed before scheduling
++ 	 * this task
++ 	 */
+diff --git a/batman-adv/patches/5008-batman-adv-Drop-unmanaged-ELP-metric-worker.patch b/batman-adv/patches/5008-batman-adv-Drop-unmanaged-ELP-metric-worker.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e5debcec4df797f431fa04c80dde4ed06390c2c
+--- /dev/null
++++ b/batman-adv/patches/5008-batman-adv-Drop-unmanaged-ELP-metric-worker.patch
+@@ -0,0 +1,247 @@
++From: Sven Eckelmann <sven@narfation.org>
++Date: Wed, 22 Jan 2025 21:51:21 +0100
++Subject: batman-adv: Drop unmanaged ELP metric worker
++
++The ELP worker needs to calculate new metric values for all neighbors
++"reachable" over an interface. Some of the used metric sources require
++locks which might need to sleep. This sleep is incompatible with the RCU
++list iterator used for the recorded neighbors. The initial approach to work
++around of this problem was to queue another work item per neighbor and then
++run this in a new context.
++
++Even when this solved the RCU vs might_sleep() conflict, it has a major
++problems: Nothing was stopping the work item in case it is not needed
++anymore - for example because one of the related interfaces was removed or
++the batman-adv module was unloaded - resulting in potential invalid memory
++accesses.
++
++Directly canceling the metric worker also has various problems:
++
++* cancel_work_sync for a to-be-deactivated interface is called with
++  rtnl_lock held. But the code in the ELP metric worker also tries to use
++  rtnl_lock() - which will never return in this case. This also means that
++  cancel_work_sync would never return because it is waiting for the worker
++  to finish.
++* iterating over the neighbor list for the to-be-deactivated interface is
++  currently done using the RCU specific methods. Which means that it is
++  possible to miss items when iterating over it without the associated
++  spinlock - a behaviour which is acceptable for a periodic metric check
++  but not for a cleanup routine (which must "stop" all still running
++  workers)
++
++The better approch is to get rid of the per interface neighbor metric
++worker and handle everything in the interface worker. The original problems
++are solved by:
++
++* creating a list of neighbors which require new metric information inside
++  the RCU protected context, gathering the metric according to the new list
++  outside the RCU protected context
++* only use rcu_trylock inside metric gathering code to avoid a deadlock
++  when the cancel_delayed_work_sync is called in the interface removal code
++  (which is called with the rtnl_lock held)
++
++Fixes: 5c3245172c01 ("batman-adv: ELP - compute the metric based on the estimated throughput")
++Signed-off-by: Sven Eckelmann <sven@narfation.org>
++(cherry picked from commit 405d49a20a205799ec453cadb3d078dc2808d563)
++
++diff --git a/net/batman-adv/bat_v.c b/net/batman-adv/bat_v.c
++index f5780bbb1fd5980845693847b3b1dc34f13a9bbc..cb2eaee379516a22f39ba7ae1d2b9ad68f4ba283 100644
++--- a/net/batman-adv/bat_v.c
+++++ b/net/batman-adv/bat_v.c
++@@ -117,8 +117,6 @@ static void
++ batadv_v_hardif_neigh_init(struct batadv_hardif_neigh_node *hardif_neigh)
++ {
++ 	ewma_throughput_init(&hardif_neigh->bat_v.throughput);
++-	INIT_WORK(&hardif_neigh->bat_v.metric_work,
++-		  batadv_v_elp_throughput_metric_update);
++ }
++ 
++ /**
++diff --git a/net/batman-adv/bat_v_elp.c b/net/batman-adv/bat_v_elp.c
++index ed933b78c2fccdc81c3aff8854db6790477347e5..e5c9ed626436cd3d8e41e161acac32df26383f47 100644
++--- a/net/batman-adv/bat_v_elp.c
+++++ b/net/batman-adv/bat_v_elp.c
++@@ -18,6 +18,7 @@
++ #include <linux/jiffies.h>
++ #include <linux/kernel.h>
++ #include <linux/kref.h>
+++#include <linux/list.h>
++ #if !defined(HAVE_BACKPORTS_LESS_5_10) && LINUX_VERSION_IS_GEQ(5, 10, 0)
++ #include <linux/minmax.h>
++ #endif
++@@ -28,6 +29,7 @@
++ #include <linux/rcupdate.h>
++ #include <linux/rtnetlink.h>
++ #include <linux/skbuff.h>
+++#include <linux/slab.h>
++ #include <linux/stddef.h>
++ #include <linux/string.h>
++ #include <linux/types.h>
++@@ -43,6 +45,18 @@
++ #include "routing.h"
++ #include "send.h"
++ 
+++/**
+++ * struct batadv_v_metric_queue_entry - list of hardif neighbors which require
+++ *  and metric update
+++ */
+++struct batadv_v_metric_queue_entry {
+++	/** @hardif_neigh: hardif neighbor scheduled for metric update */
+++	struct batadv_hardif_neigh_node *hardif_neigh;
+++
+++	/** @list: list node for metric_queue */
+++	struct list_head list;
+++};
+++
++ /**
++  * batadv_v_elp_start_timer() - restart timer for ELP periodic work
++  * @hard_iface: the interface for which the timer has to be reset
++@@ -139,10 +153,17 @@ static bool batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh,
++ 		goto default_throughput;
++ 	}
++ 
+++	/* only use rtnl_trylock because the elp worker will be cancelled while
+++	 * the rntl_lock is held. the cancel_delayed_work_sync() would otherwise
+++	 * wait forever when the elp work_item was started and it is then also
+++	 * trying to rtnl_lock
+++	 */
+++	if (!rtnl_trylock())
+++		return false;
+++
++ 	/* if not a wifi interface, check if this device provides data via
++ 	 * ethtool (e.g. an Ethernet adapter)
++ 	 */
++-	rtnl_lock();
++ 	ret = __ethtool_get_link_ksettings(hard_iface->net_dev, &link_settings);
++ 	rtnl_unlock();
++ 	if (ret == 0) {
++@@ -177,31 +198,19 @@ static bool batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh,
++ /**
++  * batadv_v_elp_throughput_metric_update() - worker updating the throughput
++  *  metric of a single hop neighbour
++- * @work: the work queue item
+++ * @neigh: the neighbour to probe
++  */
++-void batadv_v_elp_throughput_metric_update(struct work_struct *work)
+++static void
+++batadv_v_elp_throughput_metric_update(struct batadv_hardif_neigh_node *neigh)
++ {
++-	struct batadv_hardif_neigh_node_bat_v *neigh_bat_v;
++-	struct batadv_hardif_neigh_node *neigh;
++ 	u32 throughput;
++ 	bool valid;
++ 
++-	neigh_bat_v = container_of(work, struct batadv_hardif_neigh_node_bat_v,
++-				   metric_work);
++-	neigh = container_of(neigh_bat_v, struct batadv_hardif_neigh_node,
++-			     bat_v);
++-
++ 	valid = batadv_v_elp_get_throughput(neigh, &throughput);
++ 	if (!valid)
++-		goto put_neigh;
+++		return;
++ 
++ 	ewma_throughput_add(&neigh->bat_v.throughput, throughput);
++-
++-put_neigh:
++-	/* decrement refcounter to balance increment performed before scheduling
++-	 * this task
++-	 */
++-	batadv_hardif_neigh_put(neigh);
++ }
++ 
++ /**
++@@ -275,14 +284,16 @@ batadv_v_elp_wifi_neigh_probe(struct batadv_hardif_neigh_node *neigh)
++  */
++ static void batadv_v_elp_periodic_work(struct work_struct *work)
++ {
+++	struct batadv_v_metric_queue_entry *metric_entry;
+++	struct batadv_v_metric_queue_entry *metric_safe;
++ 	struct batadv_hardif_neigh_node *hardif_neigh;
++ 	struct batadv_hard_iface *hard_iface;
++ 	struct batadv_hard_iface_bat_v *bat_v;
++ 	struct batadv_elp_packet *elp_packet;
+++	struct list_head metric_queue;
++ 	struct batadv_priv *bat_priv;
++ 	struct sk_buff *skb;
++ 	u32 elp_interval;
++-	bool ret;
++ 
++ 	bat_v = container_of(work, struct batadv_hard_iface_bat_v, elp_wq.work);
++ 	hard_iface = container_of(bat_v, struct batadv_hard_iface, bat_v);
++@@ -318,6 +329,8 @@ static void batadv_v_elp_periodic_work(struct work_struct *work)
++ 
++ 	atomic_inc(&hard_iface->bat_v.elp_seqno);
++ 
+++	INIT_LIST_HEAD(&metric_queue);
+++
++ 	/* The throughput metric is updated on each sent packet. This way, if a
++ 	 * node is dead and no longer sends packets, batman-adv is still able to
++ 	 * react timely to its death.
++@@ -342,16 +355,28 @@ static void batadv_v_elp_periodic_work(struct work_struct *work)
++ 
++ 		/* Reading the estimated throughput from cfg80211 is a task that
++ 		 * may sleep and that is not allowed in an rcu protected
++-		 * context. Therefore schedule a task for that.
+++		 * context. Therefore add it to metric_queue and process it
+++		 * outside rcu protected context.
++ 		 */
++-		ret = queue_work(batadv_event_workqueue,
++-				 &hardif_neigh->bat_v.metric_work);
++-
++-		if (!ret)
+++		metric_entry = kzalloc(sizeof(*metric_entry), GFP_ATOMIC);
+++		if (!metric_entry) {
++ 			batadv_hardif_neigh_put(hardif_neigh);
+++			continue;
+++		}
+++
+++		metric_entry->hardif_neigh = hardif_neigh;
+++		list_add(&metric_entry->list, &metric_queue);
++ 	}
++ 	rcu_read_unlock();
++ 
+++	list_for_each_entry_safe(metric_entry, metric_safe, &metric_queue, list) {
+++		batadv_v_elp_throughput_metric_update(metric_entry->hardif_neigh);
+++
+++		batadv_hardif_neigh_put(metric_entry->hardif_neigh);
+++		list_del(&metric_entry->list);
+++		kfree(metric_entry);
+++	}
+++
++ restart_timer:
++ 	batadv_v_elp_start_timer(hard_iface);
++ out:
++diff --git a/net/batman-adv/bat_v_elp.h b/net/batman-adv/bat_v_elp.h
++index 9e2740195fa2d44471c9067838384f0801c7057a..c9cb0a30710045729a49921c96011d59ed67120f 100644
++--- a/net/batman-adv/bat_v_elp.h
+++++ b/net/batman-adv/bat_v_elp.h
++@@ -10,7 +10,6 @@
++ #include "main.h"
++ 
++ #include <linux/skbuff.h>
++-#include <linux/workqueue.h>
++ 
++ int batadv_v_elp_iface_enable(struct batadv_hard_iface *hard_iface);
++ void batadv_v_elp_iface_disable(struct batadv_hard_iface *hard_iface);
++@@ -19,6 +18,5 @@ void batadv_v_elp_iface_activate(struct batadv_hard_iface *primary_iface,
++ void batadv_v_elp_primary_iface_set(struct batadv_hard_iface *primary_iface);
++ int batadv_v_elp_packet_recv(struct sk_buff *skb,
++ 			     struct batadv_hard_iface *if_incoming);
++-void batadv_v_elp_throughput_metric_update(struct work_struct *work);
++ 
++ #endif /* _NET_BATMAN_ADV_BAT_V_ELP_H_ */
++diff --git a/net/batman-adv/types.h b/net/batman-adv/types.h
++index 72d1eda00ddb4ee8d21aafc0177e8aeeeff68673..6af027546229aeb17d17b26f74d109c6df1ef79a 100644
++--- a/net/batman-adv/types.h
+++++ b/net/batman-adv/types.h
++@@ -596,9 +596,6 @@ struct batadv_hardif_neigh_node_bat_v {
++ 	 *  neighbor
++ 	 */
++ 	unsigned long last_unicast_tx;
++-
++-	/** @metric_work: work queue callback item for metric update */
++-	struct work_struct metric_work;
++ };
++ 
++ /**
